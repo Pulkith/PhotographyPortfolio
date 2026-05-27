@@ -31,10 +31,45 @@ if (!is_dir($thumbDir)) {
 }
 $indexPath = $photosDir . '/index.json';
 $authPath = $photosDir . '/.admin-sessions.json';
-$adminPassword = 'Ph0t0graphy07!';
+$adminPassword = env_value('ADMIN_PASSWORD', __DIR__ . '/../.env');
 
 function auth_cookie_name() {
     return 'photography_admin_auth';
+}
+
+function env_value($key, $envPath) {
+    $systemValue = getenv($key);
+    if (is_string($systemValue) && $systemValue !== '') {
+        return $systemValue;
+    }
+    if (!is_file($envPath) || !is_readable($envPath)) {
+        return '';
+    }
+
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!is_array($lines)) {
+        return '';
+    }
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') {
+            continue;
+        }
+        [$name, $value] = array_pad(explode('=', $line, 2), 2, '');
+        if (trim($name) !== $key) {
+            continue;
+        }
+        $value = trim($value);
+        if (
+            strlen($value) >= 2
+            && (($value[0] === '"' && substr($value, -1) === '"') || ($value[0] === "'" && substr($value, -1) === "'"))
+        ) {
+            $value = substr($value, 1, -1);
+        }
+        return $value;
+    }
+
+    return '';
 }
 
 function read_auth_sessions($authPath) {
@@ -379,6 +414,9 @@ if ($action === 'authStatus') {
 }
 
 if ($action === 'login') {
+    if ($adminPassword === '') {
+        fail('Admin password is not configured.', 500);
+    }
     $password = (string) ($input['password'] ?? '');
     if (!hash_equals($adminPassword, $password)) {
         fail('Invalid password.', 401);
