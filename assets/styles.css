@@ -95,7 +95,8 @@ button:disabled {
 }
 
 .hero {
-  min-height: 88svh;
+  min-height: 88vh;
+  min-height: min(88svh, 900px);
   position: relative;
   display: grid;
   align-items: end;
@@ -108,11 +109,11 @@ button:disabled {
   inset: 0;
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.72)),
-    linear-gradient(120deg, rgba(212, 179, 111, 0.16), rgba(120, 183, 197, 0.12)),
-    url("https://photography.pulkith.com/photos/hero.jpg");
+    linear-gradient(120deg, rgba(212, 179, 111, 0.16), rgba(120, 183, 197, 0.12));
   background-size: cover;
   background-position: center;
-  transform: scale(1.04);
+  background-repeat: no-repeat;
+  transform: scale(1.02);
   animation: heroDrift 18s ease-in-out infinite alternate;
 }
 
@@ -627,6 +628,16 @@ h2 {
 }
 
 @media (max-width: 880px) {
+  .hero {
+    min-height: 82vh;
+    min-height: min(82svh, 760px);
+  }
+
+  .hero-image {
+    transform: none;
+    animation: none;
+  }
+
   .gallery-row {
     justify-content: center;
   }

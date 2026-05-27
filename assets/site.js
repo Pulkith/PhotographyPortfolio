@@ -76,17 +76,20 @@ function photoAspect(photo) {
 
 function tileBounds(photo, containerWidth, viewportWidth, viewportHeight) {
   const aspect = photoAspect(photo);
-  const baseHeight = clampNumber(viewportWidth * 0.15, 150, 280, 200);
+  const isNarrow = viewportWidth <= 640;
+  const baseHeight = isNarrow
+    ? clampNumber(viewportWidth * 0.24, 170, 330, 220)
+    : clampNumber(viewportWidth * 0.15, 150, 280, 200);
   const preferredHeight = baseHeight * priorityScale(photo.priority);
-  const minHeight = clampNumber(viewportWidth * 0.13, 138, 220, 170) * (0.94 + photo.priority * 0.02);
+  const minHeight = clampNumber(viewportWidth * (isNarrow ? 0.18 : 0.13), 138, isNarrow ? 260 : 220, 170) * (0.94 + photo.priority * 0.02);
   const maxHeight = Math.min(
-    viewportHeight * (0.52 + photo.priority * 0.032),
+    viewportHeight * ((isNarrow ? 0.58 : 0.52) + photo.priority * (isNarrow ? 0.04 : 0.032)),
     preferredHeight * (1.35 + photo.priority * 0.16),
-    clampNumber(viewportWidth * (0.3 + photo.priority * 0.042), 340, 980, 520)
+    clampNumber(viewportWidth * ((isNarrow ? 0.42 : 0.3) + photo.priority * (isNarrow ? 0.058 : 0.042)), 340, isNarrow ? 760 : 980, 520)
   );
   const maxWidth = Math.min(
-    containerWidth * (0.42 + photo.priority * 0.06),
-    viewportWidth * (0.58 + photo.priority * 0.042),
+    containerWidth * ((isNarrow ? 0.64 : 0.42) + photo.priority * (isNarrow ? 0.052 : 0.06)),
+    viewportWidth * ((isNarrow ? 0.72 : 0.58) + photo.priority * (isNarrow ? 0.03 : 0.042)),
     maxHeight * aspect
   );
   const minWidth = minHeight * aspect;
@@ -192,7 +195,10 @@ function renderGallery(photos) {
   }
 
   const heroPhoto = photos.find((photo) => photo.isLanding) || [...photos].sort((a, b) => b.priority - a.priority || a.locationIndex - b.locationIndex)[0];
-  heroImage.style.backgroundImage = `linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.72)), url("${heroPhoto.displayUrl}")`;
+  setHeroBackground(heroPhoto.thumbUrl);
+  const heroPreview = new Image();
+  heroPreview.onload = () => setHeroBackground(heroPhoto.previewUrl);
+  heroPreview.src = heroPhoto.previewUrl;
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
@@ -203,6 +209,7 @@ function renderGallery(photos) {
     });
   }, { threshold: 0.12 });
 
+  const tilesToObserve = [];
   layoutRows(photos).forEach((row, rowIndex) => {
     const rowEl = document.createElement("div");
     rowEl.className = "gallery-row";
@@ -213,9 +220,9 @@ function renderGallery(photos) {
       button.type = "button";
       button.className = `photo-tile${isFeature ? " feature" : ""}`;
       button.style.width = `${width}px`;
-      const sourceUrl = isFeature ? photo.displayUrl : photo.previewUrl;
+      const sourceUrl = width > 560 || photo.priority >= 8 ? photo.previewUrl : photo.thumbUrl;
       button.innerHTML = `
-        <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="lazy" decoding="async">
+        <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex === 0 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
         <span class="photo-meta">
           <span>${escapeHtml(photo.location)}</span>
           <span>${escapeHtml(photo.date)}</span>
@@ -223,10 +230,27 @@ function renderGallery(photos) {
       `;
       button.addEventListener("click", () => openLightbox(renderedPhotos.findIndex((item) => item.id === photo.id)));
       rowEl.appendChild(button);
-      observer.observe(button);
+      tilesToObserve.push(button);
     });
     gallery.appendChild(rowEl);
   });
+  window.requestAnimationFrame(() => {
+    tilesToObserve.forEach((button) => observer.observe(button));
+  });
+  window.setTimeout(() => {
+    tilesToObserve.forEach((button) => button.classList.add("is-visible"));
+  }, 900);
+}
+
+function setHeroBackground(url) {
+  heroImage.style.backgroundImage = `linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.72)), url("${url}")`;
+}
+
+function preloadImage(url) {
+  if (!url || preloadedImages.has(url)) return;
+  const image = new Image();
+  image.src = url;
+  preloadedImages.add(url);
 }
 
 function photoAtOffset(offset) {
@@ -238,10 +262,8 @@ function photoAtOffset(offset) {
 function preloadLightboxNeighbors() {
   [-1, 1].forEach((offset) => {
     const photo = photoAtOffset(offset);
-    if (!photo || preloadedImages.has(photo.displayUrl)) return;
-    const image = new Image();
-    image.src = photo.displayUrl;
-    preloadedImages.add(photo.displayUrl);
+    if (!photo) return;
+    preloadImage(photo.displayUrl);
   });
 }
 

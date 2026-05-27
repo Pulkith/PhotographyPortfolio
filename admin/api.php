@@ -240,8 +240,11 @@ function cleanup_photo_files($photosDir, $fileName) {
 
     $paths = [
         $photosDir . '/' . $fileName,
+        $photosDir . '/display/' . derivative_name($fileName, 'display-1800'),
         $photosDir . '/display/' . derivative_name($fileName, 'display-2400'),
+        $photosDir . '/display/' . derivative_name($fileName, 'preview-960'),
         $photosDir . '/display/' . derivative_name($fileName, 'preview-1400'),
+        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-480'),
         $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-640')
     ];
     foreach ($paths as $path) {
@@ -400,15 +403,15 @@ function save_resized_jpeg($sourcePath, $targetPath, $maxWidth, $quality) {
 
 function ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName) {
     $sourcePath = $photosDir . '/' . basename($fileName);
-    $displayName = derivative_name($fileName, 'display-2400');
-    $previewName = derivative_name($fileName, 'preview-1400');
-    $thumbName = derivative_name($fileName, 'thumb-640');
+    $displayName = derivative_name($fileName, 'display-1800');
+    $previewName = derivative_name($fileName, 'preview-960');
+    $thumbName = derivative_name($fileName, 'thumb-480');
     $displayPath = $displayDir . '/' . $displayName;
     $previewPath = $displayDir . '/' . $previewName;
     $thumbPath = $thumbDir . '/' . $thumbName;
-    $createdDisplay = is_file($displayPath) || save_resized_jpeg($sourcePath, $displayPath, 2400, 88);
-    $createdPreview = is_file($previewPath) || save_resized_jpeg($sourcePath, $previewPath, 1400, 86);
-    $createdThumb = is_file($thumbPath) || save_resized_jpeg($sourcePath, $thumbPath, 640, 82);
+    $createdDisplay = is_file($displayPath) || save_resized_jpeg($sourcePath, $displayPath, 1800, 84);
+    $createdPreview = is_file($previewPath) || save_resized_jpeg($sourcePath, $previewPath, 960, 78);
+    $createdThumb = is_file($thumbPath) || save_resized_jpeg($sourcePath, $thumbPath, 480, 72);
 
     return [
         'displayFileName' => $createdDisplay ? $displayName : null,
