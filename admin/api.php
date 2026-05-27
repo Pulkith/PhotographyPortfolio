@@ -428,7 +428,10 @@ function ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName
         'previewFileName' => $createdPreview ? $previewName : null,
         'previewUrl' => $createdPreview ? derivative_url($host, 'display', $previewName) : photo_url($host, $fileName),
         'thumbFileName' => $createdThumb ? $thumbName : null,
-        'thumbUrl' => $createdThumb ? derivative_url($host, 'thumbs', $thumbName) : photo_url($host, $fileName)
+        'thumbUrl' => $createdThumb ? derivative_url($host, 'thumbs', $thumbName) : photo_url($host, $fileName),
+        'createdDisplay' => $createdDisplay,
+        'createdPreview' => $createdPreview,
+        'createdThumb' => $createdThumb
     ];
 }
 
@@ -466,7 +469,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($action, $publicActions, tr
     respond(read_index($indexPath));
 }
 
-$protectedActions = ['upload', 'replace', 'save', 'delete', 'optimize', 'deriveMetadata'];
+$protectedActions = ['upload', 'replace', 'save', 'delete', 'optimize', 'diagnostics', 'deriveMetadata'];
 if (in_array($action, $protectedActions, true) && !is_authenticated($authPath, $input)) {
     fail('Authentication required.', 401);
 }
@@ -645,15 +648,25 @@ if ($action === 'delete') {
 
 if ($action === 'optimize') {
     $changed = 0;
+    $failed = 0;
+    $failures = [];
     foreach ($index['photos'] as &$photo) {
         if (!is_array($photo)) {
             continue;
         }
         $fileName = clean_text($photo['fileName'] ?? basename((string) ($photo['url'] ?? '')));
         if ($fileName === '' || !is_file($photosDir . '/' . $fileName)) {
+            $failed += 1;
+            $failures[] = $fileName !== '' ? $fileName . ': source file missing' : 'missing filename';
             continue;
         }
         $derivatives = ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName);
+        $isOptimized = $derivatives['createdDisplay'] && $derivatives['createdPreview'] && $derivatives['createdThumb'];
+        if (!$isOptimized) {
+            $failed += 1;
+            $failures[] = $fileName . ': derivative generation failed';
+            continue;
+        }
         $photo['displayFileName'] = $derivatives['displayFileName'];
         $photo['displayUrl'] = $derivatives['displayUrl'];
         $photo['previewFileName'] = $derivatives['previewFileName'];
@@ -666,7 +679,26 @@ if ($action === 'optimize') {
     write_index($indexPath, $index);
     $result = read_index($indexPath);
     $result['optimized'] = $changed;
+    $result['optimizeFailed'] = $failed;
+    $result['optimizeFailures'] = array_slice($failures, 0, 8);
     respond($result);
+}
+
+if ($action === 'diagnostics') {
+    respond([
+        'photosDir' => $photosDir,
+        'displayDir' => $displayDir,
+        'thumbDir' => $thumbDir,
+        'photosDirWritable' => is_writable($photosDir),
+        'displayDirWritable' => is_writable($displayDir),
+        'thumbDirWritable' => is_writable($thumbDir),
+        'gdAvailable' => function_exists('imagecreatetruecolor'),
+        'jpegAvailable' => function_exists('imagecreatefromjpeg') && function_exists('imagejpeg'),
+        'pngAvailable' => function_exists('imagecreatefrompng'),
+        'webpAvailable' => function_exists('imagecreatefromwebp'),
+        'displayFileCount' => count(glob($displayDir . '/*') ?: []),
+        'thumbFileCount' => count(glob($thumbDir . '/*') ?: [])
+    ]);
 }
 
 if ($action === 'deriveMetadata') {

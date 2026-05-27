@@ -19,6 +19,7 @@ const refreshButton = document.querySelector("#refreshButton");
 const renumberButton = document.querySelector("#renumberButton");
 const batchUploadButton = document.querySelector("#batchUploadButton");
 const optimizeButton = document.querySelector("#optimizeButton");
+const diagnosticsButton = document.querySelector("#diagnosticsButton");
 const deriveMetadataButton = document.querySelector("#deriveMetadataButton");
 
 let photos = [];
@@ -456,7 +457,14 @@ async function optimizeExisting() {
     const payload = await response.json();
     photos = normalize(payload);
     renderList();
-    setStatus(`Optimized ${payload.optimized || 0} existing image${payload.optimized === 1 ? "" : "s"}.`, listStatus);
+    const failed = payload.optimizeFailed || 0;
+    const failures = Array.isArray(payload.optimizeFailures) ? payload.optimizeFailures : [];
+    setStatus(
+      failed
+        ? `Optimized ${payload.optimized || 0}; ${failed} failed. ${failures.join(" | ")}`
+        : `Optimized ${payload.optimized || 0} existing image${payload.optimized === 1 ? "" : "s"}.`,
+      listStatus
+    );
   } catch (error) {
     setStatus(`Optimize failed against ${API_URL}.`, listStatus);
   } finally {
@@ -489,6 +497,32 @@ async function deriveMetadata() {
     setStatus(`Metadata derivation failed against ${API_URL}.`, listStatus);
   } finally {
     deriveMetadataButton.disabled = false;
+  }
+}
+
+async function checkOptimization() {
+  setStatus("Checking optimization support...", listStatus);
+  if (diagnosticsButton) diagnosticsButton.disabled = true;
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({ action: "diagnostics", token: authToken })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    setStatus(
+      `GD: ${payload.gdAvailable ? "yes" : "no"}, JPEG: ${payload.jpegAvailable ? "yes" : "no"}, display writable: ${payload.displayDirWritable ? "yes" : "no"}, thumbs writable: ${payload.thumbDirWritable ? "yes" : "no"}, display files: ${payload.displayFileCount}, thumb files: ${payload.thumbFileCount}.`,
+      listStatus
+    );
+  } catch (error) {
+    setStatus(`Optimization check failed against ${API_URL}.`, listStatus);
+  } finally {
+    if (diagnosticsButton) diagnosticsButton.disabled = false;
   }
 }
 
@@ -576,6 +610,7 @@ document.addEventListener("click", (event) => {
 saveButton?.addEventListener("click", saveChanges);
 refreshButton?.addEventListener("click", loadPhotos);
 optimizeButton?.addEventListener("click", optimizeExisting);
+diagnosticsButton?.addEventListener("click", checkOptimization);
 deriveMetadataButton?.addEventListener("click", deriveMetadata);
 loginForm?.addEventListener("submit", (event) => {
   event.preventDefault();
