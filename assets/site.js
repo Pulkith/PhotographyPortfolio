@@ -74,7 +74,7 @@ function tileBounds(photo, containerWidth, viewportWidth, viewportHeight) {
   const aspect = photoAspect(photo);
   const baseHeight = clampNumber(viewportWidth * 0.15, 150, 280, 200);
   const preferredHeight = baseHeight * priorityScale(photo.priority);
-  const minHeight = clampNumber(viewportWidth * 0.115, 118, 185, 150) * (0.92 + photo.priority * 0.018);
+  const minHeight = clampNumber(viewportWidth * 0.13, 138, 220, 170) * (0.94 + photo.priority * 0.02);
   const maxHeight = Math.min(
     viewportHeight * (0.46 + photo.priority * 0.025),
     preferredHeight * (1.2 + photo.priority * 0.12),
@@ -108,6 +108,20 @@ function scaleRow(row, rowIndex, containerWidth, viewportWidth, viewportHeight, 
   let total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, row.length - 1);
   let remaining = targetWidth - total;
   let iterations = 0;
+
+  const heightTarget = Math.max(...row.map((tile, index) => widths[index] / photoAspect(tile.photo)));
+  row
+    .map((tile, index) => ({ tile, index }))
+    .sort((a, b) => b.tile.photo.priority - a.tile.photo.priority || a.index - b.index)
+    .forEach(({ tile, index }) => {
+      if (remaining <= 1) return;
+      const { maxWidth } = tileBounds(tile.photo, containerWidth, viewportWidth, viewportHeight);
+      const priorityHeightTarget = heightTarget * (0.86 + tile.photo.priority * 0.014);
+      const desiredWidth = priorityHeightTarget * photoAspect(tile.photo);
+      const addition = Math.min(Math.max(0, desiredWidth - widths[index]), Math.max(0, maxWidth - widths[index]), remaining);
+      widths[index] += addition;
+      remaining -= addition;
+    });
 
   while (remaining > 1 && iterations < 4) {
     const growable = row
@@ -187,7 +201,7 @@ function renderGallery(photos) {
 
   layoutRows(photos).forEach((row, rowIndex) => {
     const rowEl = document.createElement("div");
-    rowEl.className = `gallery-row align-${["left", "right", "center"][rowIndex % 3]}`;
+    rowEl.className = "gallery-row";
 
     row.forEach(({ photo, width }) => {
       const isFeature = photo.priority >= 9;
