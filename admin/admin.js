@@ -444,6 +444,12 @@ async function optimizeExisting() {
   setStatus("Generating faster display images for existing uploads...", listStatus);
   optimizeButton.disabled = true;
   try {
+    const diagnostics = await optimizationDiagnostics();
+    if (!diagnostics.gdAvailable && !diagnostics.imagickAvailable) {
+      await optimizeExistingInBrowser();
+      return;
+    }
+
     const response = await fetch(API_URL, {
       method: "POST",
       credentials: "include",
@@ -470,6 +476,87 @@ async function optimizeExisting() {
   } finally {
     optimizeButton.disabled = false;
   }
+}
+
+async function optimizationDiagnostics() {
+  const response = await fetch(API_URL, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+    },
+    body: JSON.stringify({ action: "diagnostics", token: authToken })
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+function canvasBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Canvas export failed"));
+    }, "image/jpeg", quality);
+  });
+}
+
+async function resizedJpegBlob(image, maxWidth, quality) {
+  const scale = Math.min(1, maxWidth / image.naturalWidth);
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+  context.drawImage(image, 0, 0, width, height);
+  return canvasBlob(canvas, quality);
+}
+
+async function clientOptimizePhoto(photo) {
+  const image = await loadImage(photo.url);
+  const formData = new FormData();
+  formData.append("action", "clientOptimize");
+  formData.append("id", photo.id);
+  formData.append("display", await resizedJpegBlob(image, 720, 0.6), "display.jpg");
+  formData.append("preview", await resizedJpegBlob(image, 360, 0.48), "preview.jpg");
+  formData.append("thumb", await resizedJpegBlob(image, 140, 0.38), "thumb.jpg");
+  return apiPost(formData);
+}
+
+async function optimizeExistingInBrowser() {
+  let optimized = 0;
+  const failed = [];
+  setStatus("Server cannot resize images. Optimizing in this browser instead...", listStatus);
+
+  for (const photo of photos) {
+    setStatus(`Browser optimizing ${optimized + failed.length + 1} of ${photos.length}: ${photo.fileName}`, listStatus);
+    try {
+      photos = normalize(await clientOptimizePhoto(photo));
+      optimized += 1;
+    } catch (error) {
+      failed.push(photo.fileName || photo.id);
+    }
+  }
+
+  renderList();
+  setStatus(
+    failed.length
+      ? `Browser optimized ${optimized}; ${failed.length} failed. ${failed.slice(0, 5).join(" | ")}`
+      : `Browser optimized ${optimized} existing image${optimized === 1 ? "" : "s"}.`,
+    listStatus
+  );
 }
 
 async function deriveMetadata() {
@@ -504,17 +591,7 @@ async function checkOptimization() {
   setStatus("Checking optimization support...", listStatus);
   if (diagnosticsButton) diagnosticsButton.disabled = true;
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
-      },
-      body: JSON.stringify({ action: "diagnostics", token: authToken })
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = await optimizationDiagnostics();
     setStatus(
       `GD: ${payload.gdAvailable ? "yes" : "no"}, JPEG: ${payload.jpegAvailable ? "yes" : "no"}, Imagick: ${payload.imagickAvailable ? "yes" : "no"}, display writable: ${payload.displayDirWritable ? "yes" : "no"}, thumbs writable: ${payload.thumbDirWritable ? "yes" : "no"}, display files: ${payload.displayFileCount}, thumb files: ${payload.thumbFileCount}.`,
       listStatus

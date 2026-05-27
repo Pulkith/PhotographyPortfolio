@@ -528,7 +528,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($action, $publicActions, tr
     respond(read_index($indexPath));
 }
 
-$protectedActions = ['upload', 'replace', 'save', 'delete', 'optimize', 'diagnostics', 'deriveMetadata'];
+$protectedActions = ['upload', 'replace', 'save', 'delete', 'optimize', 'clientOptimize', 'diagnostics', 'deriveMetadata'];
 if (in_array($action, $protectedActions, true) && !is_authenticated($authPath, $input)) {
     fail('Authentication required.', 401);
 }
@@ -742,6 +742,62 @@ if ($action === 'optimize') {
     $result['optimizeFailed'] = $failed;
     $result['optimizeFailures'] = array_slice($failures, 0, 8);
     respond($result);
+}
+
+if ($action === 'clientOptimize') {
+    $id = clean_text($input['id'] ?? '');
+    if ($id === '') {
+        fail('Missing photo id.');
+    }
+
+    $photoIndex = null;
+    foreach ($index['photos'] as $indexKey => $photo) {
+        if (($photo['id'] ?? '') === $id) {
+            $photoIndex = $indexKey;
+            break;
+        }
+    }
+    if ($photoIndex === null) {
+        fail('Photo not found.', 404);
+    }
+
+    $fileName = clean_text($index['photos'][$photoIndex]['fileName'] ?? basename((string) ($index['photos'][$photoIndex]['url'] ?? '')));
+    if ($fileName === '') {
+        fail('Photo filename is missing.');
+    }
+
+    $uploads = [
+        'display' => [$displayDir, derivative_name($fileName, 'display-720')],
+        'preview' => [$displayDir, derivative_name($fileName, 'preview-360')],
+        'thumb' => [$thumbDir, derivative_name($fileName, 'thumb-140')]
+    ];
+
+    foreach ($uploads as $field => [$targetDir, $targetName]) {
+        if (!isset($_FILES[$field]) || !is_uploaded_file($_FILES[$field]['tmp_name'])) {
+            fail('Missing optimized ' . $field . ' file.');
+        }
+        $info = getimagesize($_FILES[$field]['tmp_name']);
+        if ($info === false || (string) ($info['mime'] ?? '') !== 'image/jpeg') {
+            fail('Optimized ' . $field . ' file must be a JPEG.');
+        }
+        $targetPath = $targetDir . '/' . $targetName;
+        if (!move_uploaded_file($_FILES[$field]['tmp_name'], $targetPath)) {
+            fail('Could not store optimized ' . $field . ' file.', 500);
+        }
+    }
+
+    $displayName = derivative_name($fileName, 'display-720');
+    $previewName = derivative_name($fileName, 'preview-360');
+    $thumbName = derivative_name($fileName, 'thumb-140');
+    $index['photos'][$photoIndex]['displayFileName'] = $displayName;
+    $index['photos'][$photoIndex]['displayUrl'] = derivative_url($host, 'display', $displayName);
+    $index['photos'][$photoIndex]['previewFileName'] = $previewName;
+    $index['photos'][$photoIndex]['previewUrl'] = derivative_url($host, 'display', $previewName);
+    $index['photos'][$photoIndex]['thumbFileName'] = $thumbName;
+    $index['photos'][$photoIndex]['thumbUrl'] = derivative_url($host, 'thumbs', $thumbName);
+
+    write_index($indexPath, $index);
+    respond(read_index($indexPath));
 }
 
 if ($action === 'diagnostics') {
