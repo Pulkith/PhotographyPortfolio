@@ -2,6 +2,10 @@ const HOST = "https://photography.pulkith.com";
 const API_URL = `${HOST}/admin/api.php`;
 const INDEX_URL = `${API_URL}?action=list`;
 
+const adminLock = document.querySelector("#adminLock");
+const loginForm = document.querySelector("#loginForm");
+const passwordInput = document.querySelector("#passwordInput");
+const loginStatus = document.querySelector("#loginStatus");
 const uploadForm = document.querySelector("#uploadForm");
 const batchForm = document.querySelector("#batchForm");
 const statusEl = document.querySelector("#status");
@@ -19,6 +23,9 @@ const deriveMetadataButton = document.querySelector("#deriveMetadataButton");
 let photos = [];
 let draggedId = null;
 let batchUploading = false;
+let authToken = localStorage.getItem("photographyAdminToken") || "";
+
+document.body.classList.add("admin-locked");
 
 function setStatus(message, target = statusEl) {
   if (!target) return;
@@ -76,16 +83,98 @@ function clamp(value, min, max, fallback) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, { cache: "no-store" });
+  const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  const response = await fetch(withToken(url), { cache: "no-store", credentials: "include", headers });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
 
+function withToken(url) {
+  if (!authToken || !url.startsWith(API_URL)) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}token=${encodeURIComponent(authToken)}`;
+}
+
+async function apiPost(body, options = {}) {
+  let nextBody = body;
+  if (authToken && body instanceof FormData) {
+    body.set("token", authToken);
+  } else if (authToken && typeof body === "string" && options.headers?.["Content-Type"] === "application/json") {
+    try {
+      const parsed = JSON.parse(body);
+      nextBody = JSON.stringify({ ...parsed, token: authToken });
+    } catch (error) {
+      nextBody = body;
+    }
+  }
+  const headers = {
+    ...(options.headers || {}),
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+  };
+  const response = await fetch(API_URL, {
+    method: "POST",
+    credentials: "include",
+    ...options,
+    headers,
+    body: nextBody
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
+function unlockAdmin() {
+  document.body.classList.remove("admin-locked");
+  if (adminLock) adminLock.hidden = true;
+}
+
+function lockAdmin(message = "Enter the admin password.") {
+  document.body.classList.add("admin-locked");
+  if (adminLock) adminLock.hidden = false;
+  setStatus(message, loginStatus);
+}
+
+async function checkAuth() {
+  try {
+    const payload = await fetchJson(`${API_URL}?action=authStatus`);
+    if (payload.authenticated) {
+      unlockAdmin();
+      await loadPhotos();
+    } else {
+      lockAdmin();
+    }
+  } catch (error) {
+    lockAdmin("Could not check admin authentication.");
+  }
+}
+
+async function login(password) {
+  setStatus("Checking password...", loginStatus);
+  try {
+    authToken = "";
+    localStorage.removeItem("photographyAdminToken");
+    const loginPayload = await apiPost(JSON.stringify({ action: "login", password }), {
+      headers: { "Content-Type": "application/json" }
+    });
+    if (loginPayload.token) {
+      authToken = loginPayload.token;
+      localStorage.setItem("photographyAdminToken", authToken);
+    }
+    const status = await fetchJson(`${API_URL}?action=authStatus`);
+    if (!status.authenticated) {
+      lockAdmin("Password accepted, but the server did not accept the auth token.");
+      return;
+    }
+    passwordInput.value = "";
+    unlockAdmin();
+    await loadPhotos();
+  } catch (error) {
+    lockAdmin("Incorrect password.");
+  }
+}
+
 async function uploadPhotoFormData(formData) {
   formData.append("action", "upload");
-  const response = await fetch(API_URL, { method: "POST", body: formData });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return normalize(await response.json());
+  return normalize(await apiPost(formData));
 }
 
 async function loadPhotos() {
@@ -224,8 +313,12 @@ async function deletePhoto(id) {
   try {
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete", id, fileName: photo.fileName })
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({ action: "delete", id, fileName: photo.fileName, token: authToken })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     setStatus("Deleted from server.", listStatus);
@@ -261,8 +354,12 @@ async function saveChanges() {
   try {
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save", data: payload() })
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({ action: "save", data: payload(), token: authToken })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     photos = normalize(await response.json());
@@ -279,8 +376,12 @@ async function optimizeExisting() {
   try {
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "optimize" })
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({ action: "optimize", token: authToken })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
@@ -300,8 +401,12 @@ async function deriveMetadata() {
   try {
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "deriveMetadata" })
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+      },
+      body: JSON.stringify({ action: "deriveMetadata", token: authToken })
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
@@ -403,10 +508,14 @@ saveButton?.addEventListener("click", saveChanges);
 refreshButton?.addEventListener("click", loadPhotos);
 optimizeButton?.addEventListener("click", optimizeExisting);
 deriveMetadataButton?.addEventListener("click", deriveMetadata);
+loginForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  login(passwordInput.value);
+});
 renumberButton?.addEventListener("click", () => {
   renumber();
   renderList();
   setStatus("Location indexes renumbered. Save to persist.", listStatus);
 });
 
-loadPhotos();
+checkAuth();

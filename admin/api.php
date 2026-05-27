@@ -1,8 +1,15 @@
 <?php
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+if ($origin !== '') {
+    header('Access-Control-Allow-Origin: ' . $origin);
+    header('Vary: Origin');
+} else {
+    header('Access-Control-Allow-Origin: *');
+}
+header('Access-Control-Allow-Credentials: true');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
@@ -23,6 +30,89 @@ if (!is_dir($thumbDir)) {
     mkdir($thumbDir, 0775, true);
 }
 $indexPath = $photosDir . '/index.json';
+$authPath = $photosDir . '/.admin-sessions.json';
+$adminPassword = 'Ph0t0graphy07!';
+
+function auth_cookie_name() {
+    return 'photography_admin_auth';
+}
+
+function read_auth_sessions($authPath) {
+    if (!is_file($authPath)) {
+        return [];
+    }
+    $json = json_decode((string) file_get_contents($authPath), true);
+    return is_array($json) ? $json : [];
+}
+
+function write_auth_sessions($authPath, $sessions) {
+    $now = time();
+    $clean = [];
+    foreach ($sessions as $token => $expires) {
+        if (is_string($token) && is_numeric($expires) && (int) $expires > $now) {
+            $clean[$token] = (int) $expires;
+        }
+    }
+    file_put_contents($authPath, json_encode($clean, JSON_PRETTY_PRINT), LOCK_EX);
+}
+
+function create_auth_token($authPath) {
+    $expires = time() + 86400;
+    $token = bin2hex(random_bytes(32));
+    $sessions = read_auth_sessions($authPath);
+    $sessions[$token] = $expires;
+    write_auth_sessions($authPath, $sessions);
+    setcookie(auth_cookie_name(), $token, [
+        'expires' => $expires,
+        'path' => '/',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'None'
+    ]);
+    return $token;
+}
+
+function clear_auth_cookie($authPath) {
+    $token = $_COOKIE[auth_cookie_name()] ?? '';
+    if (is_string($token) && $token !== '') {
+        $sessions = read_auth_sessions($authPath);
+        unset($sessions[$token]);
+        write_auth_sessions($authPath, $sessions);
+    }
+    setcookie(auth_cookie_name(), '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'None'
+    ]);
+}
+
+function is_authenticated($authPath, $input = []) {
+    $token = '';
+    $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (is_string($authorization) && stripos($authorization, 'Bearer ') === 0) {
+        $token = trim(substr($authorization, 7));
+    }
+    if ($token === '') {
+        $token = $_GET['token'] ?? $_POST['token'] ?? '';
+    }
+    if ($token === '' && is_array($input)) {
+        $token = $input['token'] ?? '';
+    }
+    if ($token === '') {
+        $token = $_COOKIE[auth_cookie_name()] ?? '';
+    }
+    if (!is_string($token) || $token === '') {
+        return false;
+    }
+    $sessions = read_auth_sessions($authPath);
+    $expires = $sessions[$token] ?? 0;
+    if (!is_numeric($expires) || (int) $expires < time()) {
+        return false;
+    }
+    return true;
+}
 
 function is_list_array($value) {
     if (!is_array($value)) {
@@ -255,10 +345,6 @@ function ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName
     ];
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    respond(read_index($indexPath));
-}
-
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 $input = strpos($contentType, 'application/json') !== false
     ? (json_decode((string) file_get_contents('php://input'), true) ?: [])
@@ -266,6 +352,34 @@ $input = strpos($contentType, 'application/json') !== false
 
 $action = (string) ($input['action'] ?? $_GET['action'] ?? '');
 $index = read_index($indexPath);
+
+if ($action === 'authStatus') {
+    respond(['authenticated' => is_authenticated($authPath, $input)]);
+}
+
+if ($action === 'login') {
+    $password = (string) ($input['password'] ?? '');
+    if (!hash_equals($adminPassword, $password)) {
+        fail('Invalid password.', 401);
+    }
+    $token = create_auth_token($authPath);
+    respond(['authenticated' => true, 'expiresInHours' => 24, 'token' => $token, 'cookieAttempted' => true]);
+}
+
+if ($action === 'logout') {
+    clear_auth_cookie($authPath);
+    respond(['authenticated' => false]);
+}
+
+$publicActions = ['', 'list'];
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($action, $publicActions, true)) {
+    respond(read_index($indexPath));
+}
+
+$protectedActions = ['upload', 'save', 'delete', 'optimize', 'deriveMetadata'];
+if (in_array($action, $protectedActions, true) && !is_authenticated($authPath, $input)) {
+    fail('Authentication required.', 401);
+}
 
 if ($action === 'upload') {
     if (!isset($_FILES['photo']) || !is_uploaded_file($_FILES['photo']['tmp_name'])) {

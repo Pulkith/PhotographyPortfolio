@@ -7,9 +7,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;650;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/styles.css?v=20260527-images">
+    <link rel="stylesheet" href="../assets/styles.css?v=20260527-auth">
   </head>
   <body class="admin-body">
+    <div class="admin-lock" id="adminLock">
+      <form class="admin-lock-panel" id="loginForm">
+        <p class="eyebrow">Protected</p>
+        <h2>Admin Access</h2>
+        <label class="field">
+          Password
+          <input id="passwordInput" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="primary-button" type="submit">Unlock</button>
+        <p class="status" id="loginStatus"></p>
+      </form>
+    </div>
+
     <main class="admin-shell">
       <header class="admin-header">
         <div>
@@ -91,6 +104,6 @@
       </div>
     </main>
 
-    <script src="admin.js?v=20260527-derivativefix"></script>
+    <script src="admin.js?v=20260527-auth4"></script>
   </body>
 </html>

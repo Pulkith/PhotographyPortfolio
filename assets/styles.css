@@ -34,6 +34,12 @@ body.admin-body {
   background: #0a0b0d;
 }
 
+body.admin-locked .admin-shell {
+  filter: blur(10px);
+  pointer-events: none;
+  user-select: none;
+}
+
 a {
   color: inherit;
 }
@@ -346,6 +352,36 @@ h2 {
   width: min(1180px, calc(100% - 28px));
   margin: 0 auto;
   padding: 28px 0 60px;
+}
+
+.admin-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: none;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 6, 8, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.admin-locked .admin-lock {
+  display: grid;
+}
+
+.admin-lock-panel {
+  width: min(420px, 100%);
+  padding: 24px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.admin-lock-panel h2 {
+  margin-bottom: 18px;
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .admin-header {
