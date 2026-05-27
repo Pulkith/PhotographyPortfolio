@@ -8,6 +8,8 @@ const lightboxImage = document.querySelector("#lightboxImage");
 const lightboxLocation = document.querySelector("#lightboxLocation");
 const lightboxDate = document.querySelector("#lightboxDate");
 const closeLightbox = document.querySelector("#closeLightbox");
+let renderedPhotos = [];
+let resizeFrame = null;
 
 function normalizePhotos(payload) {
   const photos = Array.isArray(payload) ? payload : payload?.photos;
@@ -60,26 +62,71 @@ function hashString(value) {
   return Math.abs(hash);
 }
 
-function tileClass(photo) {
-  const hash = hashString(`${photo.id}-${photo.locationIndex}`);
-  if (photo.priority >= 9) return "feature";
-  if (photo.priority >= 7 || hash % 5 === 0) return "wide";
-  if (hash % 3 === 0) return "tall";
-  return "";
+function priorityScale(priority) {
+  return 0.72 + (priority / 10) * 0.7;
 }
 
-function estimatedSpan(photo, className) {
-  const priorityBoost = photo.priority >= 8 ? 10 : photo.priority >= 6 ? 5 : 0;
-  if (className === "feature") return 54 + priorityBoost;
-  if (className === "wide") return 39 + priorityBoost;
-  if (className === "tall") return 56;
-  return 42 + Math.round(priorityBoost / 2);
+function photoAspect(photo) {
+  return clampNumber(photo.aspectRatio, 0.45, 2.6, 1.45);
+}
+
+function displayWidth(photo, containerWidth, viewportWidth, viewportHeight) {
+  const aspect = photoAspect(photo);
+  const screenBase = clampNumber(viewportWidth * 0.14, 132, 260, 180);
+  const preferredHeight = screenBase * priorityScale(photo.priority);
+  const maxWidth = Math.min(containerWidth * 0.5, viewportWidth * 0.52);
+  const maxHeightWidth = aspect * viewportHeight * 0.52;
+  const jitter = 0.94 + (hashString(`${photo.id}-${photo.locationIndex}`) % 15) / 100;
+  const preferredWidth = preferredHeight * aspect * jitter;
+
+  return Math.round(clampNumber(preferredWidth, 118, Math.min(maxWidth, maxHeightWidth), 180));
+}
+
+function layoutRows(photos) {
+  const containerWidth = gallery.clientWidth || gallery.getBoundingClientRect().width || window.innerWidth;
+  const viewportWidth = window.innerWidth || containerWidth;
+  const viewportHeight = window.innerHeight || 800;
+  const gap = clampNumber(viewportWidth * 0.015, 12, 24, 16);
+  const rows = [];
+  let current = [];
+  let currentWidth = 0;
+
+  photos.forEach((photo, index) => {
+    const width = displayWidth(photo, containerWidth, viewportWidth, viewportHeight);
+    const tile = { photo, width };
+
+    if (photo.priority >= 9) {
+      if (current.length) {
+        rows.push(current);
+        current = [];
+        currentWidth = 0;
+      }
+      rows.push([tile]);
+      return;
+    }
+
+    const rowTarget = containerWidth * (0.78 + ((index % 4) * 0.055));
+    const nextWidth = currentWidth + width + (current.length ? gap : 0);
+    if (current.length && nextWidth > rowTarget) {
+      rows.push(current);
+      current = [tile];
+      currentWidth = width;
+      return;
+    }
+
+    current.push(tile);
+    currentWidth = nextWidth;
+  });
+
+  if (current.length) rows.push(current);
+  return rows;
 }
 
 function renderGallery(photos) {
+  renderedPhotos = photos;
   gallery.innerHTML = "";
   if (!photos.length) {
-    gallery.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">Upload photos from /admin to populate the portfolio.</div>';
+    gallery.innerHTML = '<div class="empty-state">Upload photos from /admin to populate the portfolio.</div>';
     return;
   }
 
@@ -95,23 +142,30 @@ function renderGallery(photos) {
     });
   }, { threshold: 0.12 });
 
-  photos.forEach((photo) => {
-    const className = tileClass(photo);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `photo-tile ${className}`.trim();
-    button.style.gridRowEnd = `span ${estimatedSpan(photo, className)}`;
-    const sourceUrl = className === "feature" ? photo.displayUrl : photo.previewUrl;
-    button.innerHTML = `
-      <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="lazy" decoding="async">
-      <span class="photo-meta">
-        <span>${escapeHtml(photo.location)}</span>
-        <span>${escapeHtml(photo.date)}</span>
-      </span>
-    `;
-    button.addEventListener("click", () => openLightbox(photo));
-    gallery.appendChild(button);
-    observer.observe(button);
+  layoutRows(photos).forEach((row, rowIndex) => {
+    const rowEl = document.createElement("div");
+    rowEl.className = `gallery-row align-${["left", "right", "center"][rowIndex % 3]}`;
+    if (row.length === 1 && row[0].photo.priority >= 9) rowEl.classList.add("feature-row");
+
+    row.forEach(({ photo, width }) => {
+      const isFeature = photo.priority >= 9;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `photo-tile${isFeature ? " feature" : ""}`;
+      button.style.width = `${width}px`;
+      const sourceUrl = isFeature ? photo.displayUrl : photo.previewUrl;
+      button.innerHTML = `
+        <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="lazy" decoding="async">
+        <span class="photo-meta">
+          <span>${escapeHtml(photo.location)}</span>
+          <span>${escapeHtml(photo.date)}</span>
+        </span>
+      `;
+      button.addEventListener("click", () => openLightbox(photo));
+      rowEl.appendChild(button);
+      observer.observe(button);
+    });
+    gallery.appendChild(rowEl);
   });
 }
 
@@ -155,9 +209,15 @@ async function loadPhotos() {
     const payload = await response.json();
     renderGallery(normalizePhotos(payload));
   } catch (error) {
-    gallery.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">Could not load the hosted photo index.</div>';
+    gallery.innerHTML = '<div class="empty-state">Could not load the hosted photo index.</div>';
   }
 }
+
+window.addEventListener("resize", () => {
+  if (!renderedPhotos.length) return;
+  window.cancelAnimationFrame(resizeFrame);
+  resizeFrame = window.requestAnimationFrame(() => renderGallery(renderedPhotos));
+});
 
 closeLightbox.addEventListener("click", closeViewer);
 lightbox.addEventListener("click", (event) => {
