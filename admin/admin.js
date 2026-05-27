@@ -13,6 +13,7 @@ const saveButton = document.querySelector("#saveButton");
 const refreshButton = document.querySelector("#refreshButton");
 const renumberButton = document.querySelector("#renumberButton");
 const batchUploadButton = document.querySelector("#batchUploadButton");
+const optimizeButton = document.querySelector("#optimizeButton");
 
 let photos = [];
 let draggedId = null;
@@ -29,6 +30,12 @@ function normalize(payload) {
     id: photo.id || `photo-${Date.now()}-${index}`,
     fileName: photo.fileName || filenameFromUrl(photo.url) || "",
     url: absoluteUrl(photo.url || photo.fileName || ""),
+    displayFileName: photo.displayFileName || filenameFromUrl(photo.displayUrl) || null,
+    displayUrl: absoluteUrl(photo.displayUrl || photo.url || photo.fileName || ""),
+    previewFileName: photo.previewFileName || filenameFromUrl(photo.previewUrl) || null,
+    previewUrl: absoluteUrl(photo.previewUrl || photo.displayUrl || photo.url || photo.fileName || ""),
+    thumbFileName: photo.thumbFileName || filenameFromUrl(photo.thumbUrl) || null,
+    thumbUrl: absoluteUrl(photo.thumbUrl || photo.previewUrl || photo.displayUrl || photo.url || photo.fileName || ""),
     location: photo.location || "",
     date: photo.date || "",
     priority: clamp(photo.priority, 1, 10, 5),
@@ -104,7 +111,7 @@ function renderList() {
     item.draggable = true;
     item.dataset.id = photo.id;
     item.innerHTML = `
-      <img class="admin-thumb" src="${photo.url}" alt="">
+      <img class="admin-thumb" src="${photo.thumbUrl}" alt="" loading="lazy" decoding="async">
       <div>
         <div class="admin-fields">
           ${fieldHtml("location", "Location", photo.location, "wide-field")}
@@ -242,6 +249,27 @@ async function saveChanges() {
   }
 }
 
+async function optimizeExisting() {
+  setStatus("Generating faster display images for existing uploads...", listStatus);
+  optimizeButton.disabled = true;
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "optimize" })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    photos = normalize(payload);
+    renderList();
+    setStatus(`Optimized ${payload.optimized || 0} existing image${payload.optimized === 1 ? "" : "s"}.`, listStatus);
+  } catch (error) {
+    setStatus(`Optimize failed against ${API_URL}.`, listStatus);
+  } finally {
+    optimizeButton.disabled = false;
+  }
+}
+
 uploadForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   setStatus("Uploading original file...");
@@ -280,6 +308,7 @@ async function uploadBatch() {
   const failed = [];
 
   for (const file of files) {
+    setStatus(`Uploading ${uploaded + failed.length + 1} of ${files.length}: ${file.name}`, batchStatus);
     const formData = new FormData();
     formData.append("photo", file);
     formData.append("location", "");
@@ -324,6 +353,7 @@ document.addEventListener("click", (event) => {
 
 saveButton?.addEventListener("click", saveChanges);
 refreshButton?.addEventListener("click", loadPhotos);
+optimizeButton?.addEventListener("click", optimizeExisting);
 renumberButton?.addEventListener("click", () => {
   renumber();
   renderList();

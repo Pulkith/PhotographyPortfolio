@@ -16,6 +16,9 @@ function normalizePhotos(payload) {
     .map((photo, index) => ({
       id: photo.id || `photo-${index}`,
       url: absolutePhotoUrl(photo.url),
+      displayUrl: absolutePhotoUrl(photo.displayUrl || photo.url),
+      previewUrl: absolutePhotoUrl(photo.previewUrl || photo.displayUrl || photo.url),
+      thumbUrl: absolutePhotoUrl(photo.thumbUrl || photo.previewUrl || photo.displayUrl || photo.url),
       location: photo.location || "Location pending",
       date: photo.date || "",
       priority: clampNumber(photo.priority, 1, 10, 5),
@@ -70,7 +73,7 @@ function renderGallery(photos) {
   }
 
   const heroPhoto = [...photos].sort((a, b) => b.priority - a.priority || a.locationIndex - b.locationIndex)[0];
-  heroImage.style.backgroundImage = `linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.72)), url("${heroPhoto.url}")`;
+  heroImage.style.backgroundImage = `linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.72)), url("${heroPhoto.displayUrl}")`;
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
@@ -87,8 +90,9 @@ function renderGallery(photos) {
     button.type = "button";
     button.className = `photo-tile ${className}`.trim();
     button.style.gridRowEnd = `span ${estimatedSpan(photo, className)}`;
+    const sourceUrl = className === "feature" ? photo.displayUrl : photo.previewUrl;
     button.innerHTML = `
-      <img src="${photo.url}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="lazy" decoding="async">
+      <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="lazy" decoding="async">
       <span class="photo-meta">
         <span>${escapeHtml(photo.location)}</span>
         <span>${escapeHtml(photo.date)}</span>
@@ -101,12 +105,20 @@ function renderGallery(photos) {
 }
 
 function openLightbox(photo) {
-  lightboxImage.src = photo.url;
+  lightboxImage.src = photo.displayUrl;
   lightboxImage.alt = photo.caption || `${photo.location} photograph`;
   lightboxLocation.textContent = photo.location;
   lightboxDate.textContent = photo.date;
   lightbox.classList.add("open");
   document.body.style.overflow = "hidden";
+
+  const original = new Image();
+  original.onload = () => {
+    if (lightbox.classList.contains("open")) {
+      lightboxImage.src = photo.url;
+    }
+  };
+  original.src = photo.url;
 }
 
 function closeViewer() {

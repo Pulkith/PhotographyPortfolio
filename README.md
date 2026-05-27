@@ -31,4 +31,6 @@ Then open:
 
 ## Deployment
 
-Copy this folder to `photography.pulkith.com`. Make sure `photos/` is writable by PHP and keep `photos/index.json` in place. The admin intentionally has no authentication because this was requested.
+Copy this folder to `photography.pulkith.com`. Make sure `photos/` is writable by PHP and keep `photos/index.json` in place. The upload API creates `photos/display/` and `photos/thumbs/` for optimized derivatives while preserving the original uploaded files. PHP GD is required for derivative generation; without it, the site falls back to original files.
+
+The admin intentionally has no authentication because this was requested.
