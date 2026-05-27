@@ -76,13 +76,13 @@ function tileBounds(photo, containerWidth, viewportWidth, viewportHeight) {
   const preferredHeight = baseHeight * priorityScale(photo.priority);
   const minHeight = clampNumber(viewportWidth * 0.115, 118, 185, 150) * (0.92 + photo.priority * 0.018);
   const maxHeight = Math.min(
-    viewportHeight * 0.5,
-    preferredHeight * 1.34,
-    clampNumber(viewportWidth * 0.36, 280, 480, 360)
+    viewportHeight * (0.46 + photo.priority * 0.025),
+    preferredHeight * (1.2 + photo.priority * 0.12),
+    clampNumber(viewportWidth * (0.24 + photo.priority * 0.032), 280, 760, 420)
   );
   const maxWidth = Math.min(
-    containerWidth * (0.3 + photo.priority * 0.025),
-    viewportWidth * 0.54,
+    containerWidth * (0.34 + photo.priority * 0.05),
+    viewportWidth * (0.5 + photo.priority * 0.035),
     maxHeight * aspect
   );
   const minWidth = minHeight * aspect;
@@ -99,7 +99,7 @@ function displayWidth(photo, containerWidth, viewportWidth, viewportHeight) {
 }
 
 function rowTargetWidth(rowIndex, containerWidth) {
-  return containerWidth * (0.92 + ((rowIndex % 3) * 0.025));
+  return containerWidth * (0.97 + ((rowIndex % 2) * 0.015));
 }
 
 function scaleRow(row, rowIndex, containerWidth, viewportWidth, viewportHeight, gap) {
@@ -113,16 +113,18 @@ function scaleRow(row, rowIndex, containerWidth, viewportWidth, viewportHeight, 
     const growable = row
       .map((tile, index) => {
         const { maxWidth } = tileBounds(tile.photo, containerWidth, viewportWidth, viewportHeight);
-        return { index, room: Math.max(0, maxWidth - widths[index]), weight: tile.photo.priority };
+        return { index, room: Math.max(0, maxWidth - widths[index]), priority: tile.photo.priority };
       })
-      .filter((item) => item.room > 0);
+      .filter((item) => item.room > 0)
+      .sort((a, b) => b.priority - a.priority || b.room - a.room);
 
-    const totalWeight = growable.reduce((sum, item) => sum + item.weight, 0);
-    if (!totalWeight) break;
+    if (!growable.length) break;
 
     growable.forEach((item) => {
-      const addition = Math.min(item.room, remaining * (item.weight / totalWeight));
+      if (remaining <= 0) return;
+      const addition = Math.min(item.room, remaining);
       widths[item.index] += addition;
+      remaining -= addition;
     });
 
     total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, row.length - 1);
