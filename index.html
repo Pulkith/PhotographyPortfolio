@@ -9,6 +9,7 @@
     <meta name="author" content="Pulkith Paruchuri">
     <link rel="canonical" href="https://photography.pulkith.com/">
     <link rel="icon" type="image/png" href="assets/favicon.png">
+    <link rel="preload" href="https://photography.pulkith.com/photos/index.json" as="fetch" crossorigin>
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Pulkith Paruchuri Photography">
     <meta property="og:title" content="Pulkith Paruchuri Photography">
@@ -23,7 +24,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;650;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/styles.css?v=20260527-mobile-load">
+    <link rel="stylesheet" href="assets/styles.css?v=20260527-mobile-fix">
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -53,7 +54,9 @@
     </nav>
 
     <header class="hero">
-      <div class="hero-image" id="heroImage" aria-hidden="true"></div>
+      <div class="hero-image" aria-hidden="true">
+        <img id="heroImage" alt="" loading="eager" fetchpriority="high" decoding="async">
+      </div>
       <div class="hero-content">
         <p class="eyebrow">Photography</p>
         <h1>Pulkith Paruchuri</h1>
@@ -120,6 +123,6 @@
       </div>
     </div>
 
-    <script src="assets/site.js?v=20260527-mobile-load"></script>
+    <script src="assets/site.js?v=20260527-mobile-fix"></script>
   </body>
 </html>

@@ -1,5 +1,6 @@
 const HOST = "https://photography.pulkith.com";
-const INDEX_URL = `${HOST}/admin/api.php?action=list`;
+const INDEX_URL = `${HOST}/photos/index.json`;
+const API_INDEX_URL = `${HOST}/admin/api.php?action=list`;
 
 const gallery = document.querySelector("#gallery");
 const heroImage = document.querySelector("#heroImage");
@@ -13,6 +14,7 @@ const nextLightbox = document.querySelector("#nextLightbox");
 let renderedPhotos = [];
 let resizeFrame = null;
 let activePhotoIndex = -1;
+let layoutWidth = 0;
 const preloadedImages = new Set();
 
 function normalizePhotos(payload) {
@@ -188,6 +190,7 @@ function layoutRows(photos) {
 
 function renderGallery(photos) {
   renderedPhotos = photos;
+  layoutWidth = window.innerWidth || gallery.clientWidth || 0;
   gallery.innerHTML = "";
   if (!photos.length) {
     gallery.innerHTML = '<div class="empty-state">Upload photos from /admin to populate the portfolio.</div>';
@@ -195,9 +198,9 @@ function renderGallery(photos) {
   }
 
   const heroPhoto = photos.find((photo) => photo.isLanding) || [...photos].sort((a, b) => b.priority - a.priority || a.locationIndex - b.locationIndex)[0];
-  setHeroBackground(heroPhoto.thumbUrl);
+  setHeroImage(heroPhoto.thumbUrl);
   const heroPreview = new Image();
-  heroPreview.onload = () => setHeroBackground(heroPhoto.previewUrl);
+  heroPreview.onload = () => setHeroImage(heroPhoto.previewUrl);
   heroPreview.src = heroPhoto.previewUrl;
 
   const observer = new IntersectionObserver((entries) => {
@@ -209,7 +212,6 @@ function renderGallery(photos) {
     });
   }, { threshold: 0.12 });
 
-  const tilesToObserve = [];
   layoutRows(photos).forEach((row, rowIndex) => {
     const rowEl = document.createElement("div");
     rowEl.className = "gallery-row";
@@ -222,7 +224,7 @@ function renderGallery(photos) {
       button.style.width = `${width}px`;
       const sourceUrl = width > 560 || photo.priority >= 8 ? photo.previewUrl : photo.thumbUrl;
       button.innerHTML = `
-        <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex === 0 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
+        <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex < 3 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
         <span class="photo-meta">
           <span>${escapeHtml(photo.location)}</span>
           <span>${escapeHtml(photo.date)}</span>
@@ -230,20 +232,18 @@ function renderGallery(photos) {
       `;
       button.addEventListener("click", () => openLightbox(renderedPhotos.findIndex((item) => item.id === photo.id)));
       rowEl.appendChild(button);
-      tilesToObserve.push(button);
+      window.requestAnimationFrame(() => {
+        button.classList.add("is-visible");
+        observer.unobserve(button);
+      });
     });
     gallery.appendChild(rowEl);
   });
-  window.requestAnimationFrame(() => {
-    tilesToObserve.forEach((button) => observer.observe(button));
-  });
-  window.setTimeout(() => {
-    tilesToObserve.forEach((button) => button.classList.add("is-visible"));
-  }, 900);
 }
 
-function setHeroBackground(url) {
-  heroImage.style.backgroundImage = `linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.72)), url("${url}")`;
+function setHeroImage(url) {
+  if (heroImage.getAttribute("src") === url) return;
+  heroImage.src = url;
 }
 
 function preloadImage(url) {
@@ -312,7 +312,10 @@ function escapeHtml(value) {
 
 async function loadPhotos() {
   try {
-    const response = await fetch(INDEX_URL, { cache: "no-store" });
+    let response = await fetch(INDEX_URL, { cache: "default" });
+    if (!response.ok) {
+      response = await fetch(API_INDEX_URL, { cache: "no-store" });
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     renderGallery(normalizePhotos(payload));
@@ -323,6 +326,8 @@ async function loadPhotos() {
 
 window.addEventListener("resize", () => {
   if (!renderedPhotos.length) return;
+  const nextWidth = window.innerWidth || gallery.clientWidth || 0;
+  if (Math.abs(nextWidth - layoutWidth) < 24) return;
   window.cancelAnimationFrame(resizeFrame);
   resizeFrame = window.requestAnimationFrame(() => renderGallery(renderedPhotos));
 });
