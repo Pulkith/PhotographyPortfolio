@@ -368,19 +368,38 @@ function create_image_resource($path, $mime) {
     if (!function_exists('imagecreatetruecolor')) {
         return null;
     }
-    if ($mime === 'image/jpeg') {
+    if ($mime === 'image/jpeg' && function_exists('imagecreatefromjpeg')) {
         return imagecreatefromjpeg($path);
     }
-    if ($mime === 'image/png') {
+    if ($mime === 'image/png' && function_exists('imagecreatefrompng')) {
         return imagecreatefrompng($path);
     }
     if ($mime === 'image/webp' && function_exists('imagecreatefromwebp')) {
         return imagecreatefromwebp($path);
     }
-    if ($mime === 'image/gif') {
+    if ($mime === 'image/gif' && function_exists('imagecreatefromgif')) {
         return imagecreatefromgif($path);
     }
     return null;
+}
+
+function save_resized_with_imagick($sourcePath, $targetPath, $maxWidth, $quality) {
+    if (!class_exists('Imagick')) {
+        return false;
+    }
+    try {
+        $image = new Imagick($sourcePath);
+        $image->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+        $image->thumbnailImage($maxWidth, 0);
+        $image->setImageFormat('jpeg');
+        $image->setImageCompressionQuality($quality);
+        $saved = $image->writeImage($targetPath);
+        $image->clear();
+        $image->destroy();
+        return $saved && is_file($targetPath);
+    } catch (Throwable $error) {
+        return false;
+    }
 }
 
 function save_resized_jpeg($sourcePath, $targetPath, $maxWidth, $quality) {
@@ -393,6 +412,13 @@ function save_resized_jpeg($sourcePath, $targetPath, $maxWidth, $quality) {
     $mime = (string) ($info['mime'] ?? '');
     if ($sourceWidth < 1 || $sourceHeight < 1) {
         return false;
+    }
+    if (!is_dir(dirname($targetPath)) || !is_writable(dirname($targetPath))) {
+        return false;
+    }
+
+    if (save_resized_with_imagick($sourcePath, $targetPath, $maxWidth, $quality)) {
+        return true;
     }
 
     $source = create_image_resource($sourcePath, $mime);
@@ -408,6 +434,36 @@ function save_resized_jpeg($sourcePath, $targetPath, $maxWidth, $quality) {
     imagedestroy($source);
     imagedestroy($target);
     return $saved;
+}
+
+function derivative_failure_reason($sourcePath, $targetPath) {
+    $info = getimagesize($sourcePath);
+    if ($info === false) {
+        return 'getimagesize failed';
+    }
+    $mime = (string) ($info['mime'] ?? '');
+    if (!is_dir(dirname($targetPath))) {
+        return 'target directory missing';
+    }
+    if (!is_writable(dirname($targetPath))) {
+        return 'target directory not writable';
+    }
+    if (class_exists('Imagick')) {
+        return 'Imagick write failed';
+    }
+    if (!function_exists('imagecreatetruecolor')) {
+        return 'GD missing';
+    }
+    if ($mime === 'image/jpeg' && !function_exists('imagecreatefromjpeg')) {
+        return 'GD JPEG read missing';
+    }
+    if (!function_exists('imagejpeg')) {
+        return 'GD JPEG write missing';
+    }
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], true)) {
+        return 'unsupported mime ' . $mime;
+    }
+    return 'GD resize/write failed';
 }
 
 function ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName) {
@@ -431,7 +487,10 @@ function ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName
         'thumbUrl' => $createdThumb ? derivative_url($host, 'thumbs', $thumbName) : photo_url($host, $fileName),
         'createdDisplay' => $createdDisplay,
         'createdPreview' => $createdPreview,
-        'createdThumb' => $createdThumb
+        'createdThumb' => $createdThumb,
+        'failureReason' => (!$createdDisplay ? 'display: ' . derivative_failure_reason($sourcePath, $displayPath) : '')
+            . (!$createdPreview ? ' preview: ' . derivative_failure_reason($sourcePath, $previewPath) : '')
+            . (!$createdThumb ? ' thumb: ' . derivative_failure_reason($sourcePath, $thumbPath) : '')
     ];
 }
 
@@ -664,7 +723,8 @@ if ($action === 'optimize') {
         $isOptimized = $derivatives['createdDisplay'] && $derivatives['createdPreview'] && $derivatives['createdThumb'];
         if (!$isOptimized) {
             $failed += 1;
-            $failures[] = $fileName . ': derivative generation failed';
+            $reason = trim($derivatives['failureReason'] ?? 'derivative generation failed');
+            $failures[] = $fileName . ': ' . $reason;
             continue;
         }
         $photo['displayFileName'] = $derivatives['displayFileName'];
@@ -696,6 +756,7 @@ if ($action === 'diagnostics') {
         'jpegAvailable' => function_exists('imagecreatefromjpeg') && function_exists('imagejpeg'),
         'pngAvailable' => function_exists('imagecreatefrompng'),
         'webpAvailable' => function_exists('imagecreatefromwebp'),
+        'imagickAvailable' => class_exists('Imagick'),
         'displayFileCount' => count(glob($displayDir . '/*') ?: []),
         'thumbFileCount' => count(glob($thumbDir . '/*') ?: [])
     ]);

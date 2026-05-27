@@ -516,7 +516,7 @@ async function checkOptimization() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     setStatus(
-      `GD: ${payload.gdAvailable ? "yes" : "no"}, JPEG: ${payload.jpegAvailable ? "yes" : "no"}, display writable: ${payload.displayDirWritable ? "yes" : "no"}, thumbs writable: ${payload.thumbDirWritable ? "yes" : "no"}, display files: ${payload.displayFileCount}, thumb files: ${payload.thumbFileCount}.`,
+      `GD: ${payload.gdAvailable ? "yes" : "no"}, JPEG: ${payload.jpegAvailable ? "yes" : "no"}, Imagick: ${payload.imagickAvailable ? "yes" : "no"}, display writable: ${payload.displayDirWritable ? "yes" : "no"}, thumbs writable: ${payload.thumbDirWritable ? "yes" : "no"}, display files: ${payload.displayFileCount}, thumb files: ${payload.thumbFileCount}.`,
       listStatus
     );
   } catch (error) {
