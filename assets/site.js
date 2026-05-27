@@ -76,13 +76,13 @@ function tileBounds(photo, containerWidth, viewportWidth, viewportHeight) {
   const preferredHeight = baseHeight * priorityScale(photo.priority);
   const minHeight = clampNumber(viewportWidth * 0.13, 138, 220, 170) * (0.94 + photo.priority * 0.02);
   const maxHeight = Math.min(
-    viewportHeight * (0.46 + photo.priority * 0.025),
-    preferredHeight * (1.2 + photo.priority * 0.12),
-    clampNumber(viewportWidth * (0.24 + photo.priority * 0.032), 280, 760, 420)
+    viewportHeight * (0.52 + photo.priority * 0.032),
+    preferredHeight * (1.35 + photo.priority * 0.16),
+    clampNumber(viewportWidth * (0.3 + photo.priority * 0.042), 340, 980, 520)
   );
   const maxWidth = Math.min(
-    containerWidth * (0.34 + photo.priority * 0.05),
-    viewportWidth * (0.5 + photo.priority * 0.035),
+    containerWidth * (0.42 + photo.priority * 0.06),
+    viewportWidth * (0.58 + photo.priority * 0.042),
     maxHeight * aspect
   );
   const minWidth = minHeight * aspect;
