@@ -63,7 +63,7 @@ function hashString(value) {
 }
 
 function priorityScale(priority) {
-  return 0.72 + (priority / 10) * 0.7;
+  return 0.86 + ((priority - 1) / 9) * 0.78;
 }
 
 function photoAspect(photo) {
@@ -72,14 +72,51 @@ function photoAspect(photo) {
 
 function displayWidth(photo, containerWidth, viewportWidth, viewportHeight) {
   const aspect = photoAspect(photo);
-  const screenBase = clampNumber(viewportWidth * 0.14, 132, 260, 180);
+  const screenBase = clampNumber(viewportWidth * 0.16, 160, 300, 200);
   const preferredHeight = screenBase * priorityScale(photo.priority);
-  const maxWidth = Math.min(containerWidth * 0.5, viewportWidth * 0.52);
+  const priorityMax = 0.34 + (photo.priority / 10) * 0.2;
+  const maxWidth = Math.min(containerWidth * priorityMax, viewportWidth * 0.54);
   const maxHeightWidth = aspect * viewportHeight * 0.52;
   const jitter = 0.94 + (hashString(`${photo.id}-${photo.locationIndex}`) % 15) / 100;
   const preferredWidth = preferredHeight * aspect * jitter;
+  const minWidth = clampNumber(viewportWidth * 0.18, 150, 230, 180);
 
-  return Math.round(clampNumber(preferredWidth, 118, Math.min(maxWidth, maxHeightWidth), 180));
+  return Math.round(clampNumber(preferredWidth, minWidth, Math.max(minWidth, Math.min(maxWidth, maxHeightWidth)), 200));
+}
+
+function rowTargetWidth(rowIndex, containerWidth) {
+  return containerWidth * (0.92 + ((rowIndex % 3) * 0.025));
+}
+
+function scaleRow(row, rowIndex, containerWidth, gap) {
+  const targetWidth = rowTargetWidth(rowIndex, containerWidth);
+  let widths = row.map((tile) => tile.width);
+  let total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, row.length - 1);
+  let remaining = targetWidth - total;
+  let iterations = 0;
+
+  while (remaining > 1 && iterations < 4) {
+    const growable = row
+      .map((tile, index) => {
+        const maxWidth = containerWidth * (0.36 + (tile.photo.priority / 10) * 0.18);
+        return { index, room: Math.max(0, maxWidth - widths[index]), weight: tile.photo.priority };
+      })
+      .filter((item) => item.room > 0);
+
+    const totalWeight = growable.reduce((sum, item) => sum + item.weight, 0);
+    if (!totalWeight) break;
+
+    growable.forEach((item) => {
+      const addition = Math.min(item.room, remaining * (item.weight / totalWeight));
+      widths[item.index] += addition;
+    });
+
+    total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, row.length - 1);
+    remaining = targetWidth - total;
+    iterations += 1;
+  }
+
+  return row.map((tile, index) => ({ ...tile, width: Math.round(widths[index]) }));
 }
 
 function layoutRows(photos) {
@@ -95,20 +132,10 @@ function layoutRows(photos) {
     const width = displayWidth(photo, containerWidth, viewportWidth, viewportHeight);
     const tile = { photo, width };
 
-    if (photo.priority >= 9) {
-      if (current.length) {
-        rows.push(current);
-        current = [];
-        currentWidth = 0;
-      }
-      rows.push([tile]);
-      return;
-    }
-
-    const rowTarget = containerWidth * (0.78 + ((index % 4) * 0.055));
+    const rowTarget = rowTargetWidth(rows.length, containerWidth);
     const nextWidth = currentWidth + width + (current.length ? gap : 0);
     if (current.length && nextWidth > rowTarget) {
-      rows.push(current);
+      rows.push(scaleRow(current, rows.length, containerWidth, gap));
       current = [tile];
       currentWidth = width;
       return;
@@ -118,7 +145,7 @@ function layoutRows(photos) {
     currentWidth = nextWidth;
   });
 
-  if (current.length) rows.push(current);
+  if (current.length) rows.push(scaleRow(current, rows.length, containerWidth, gap));
   return rows;
 }
 
@@ -145,7 +172,6 @@ function renderGallery(photos) {
   layoutRows(photos).forEach((row, rowIndex) => {
     const rowEl = document.createElement("div");
     rowEl.className = `gallery-row align-${["left", "right", "center"][rowIndex % 3]}`;
-    if (row.length === 1 && row[0].photo.priority >= 9) rowEl.classList.add("feature-row");
 
     row.forEach(({ photo, width }) => {
       const isFeature = photo.priority >= 9;

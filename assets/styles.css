@@ -207,13 +207,8 @@ h2 {
   justify-content: flex-end;
 }
 
-.gallery-row.align-center,
-.gallery-row.feature-row {
+.gallery-row.align-center {
   justify-content: center;
-}
-
-.gallery-row.feature-row {
-  margin: clamp(8px, 1.6vw, 22px) 0;
 }
 
 .photo-tile {
