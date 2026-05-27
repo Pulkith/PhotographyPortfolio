@@ -1,14 +1,30 @@
 const HOST = "https://photography.pulkith.com";
 const INDEX_URL = `${HOST}/photos/index.json`;
 const API_INDEX_URL = `${HOST}/admin/api.php?action=list`;
+// const IMAGE_WIDTHS = {
+//   thumb: 220,
+//   preview: 540,
+//   display: 1080,
+//   galleryMax: 540,
+//   lightboxMax: 1080,
+//   eagerRows: 2,
+//   lookaheadRows: 2
+// };
+
 const IMAGE_WIDTHS = {
-  thumb: 220,
-  preview: 540,
-  display: 1080,
-  galleryMax: 540,
-  lightboxMax: 1080,
-  eagerRows: 2,
-  lookaheadRows: 2
+  thumb: 540,          // → 540 (1 step), 1080 (2 steps)
+
+  preview: 1080,        // → 1080 (1 step)
+
+  display: 1600,       // → ~1600–2160 (1–2 steps up)
+
+  galleryMax: 1080,     // → 1080 (1 step)
+
+  lightboxMax: 2160,   // → ~1600–2160 (1–2 steps up)
+
+  eagerRows: 2,        // → 3–4
+
+  lookaheadRows: 2     // → 3–4
 };
 
 const gallery = document.querySelector("#gallery");
