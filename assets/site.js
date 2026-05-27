@@ -70,25 +70,39 @@ function photoAspect(photo) {
   return clampNumber(photo.aspectRatio, 0.45, 2.6, 1.45);
 }
 
-function displayWidth(photo, containerWidth, viewportWidth, viewportHeight) {
+function tileBounds(photo, containerWidth, viewportWidth, viewportHeight) {
   const aspect = photoAspect(photo);
-  const screenBase = clampNumber(viewportWidth * 0.16, 160, 300, 200);
-  const preferredHeight = screenBase * priorityScale(photo.priority);
-  const priorityMax = 0.34 + (photo.priority / 10) * 0.2;
-  const maxWidth = Math.min(containerWidth * priorityMax, viewportWidth * 0.54);
-  const maxHeightWidth = aspect * viewportHeight * 0.52;
+  const baseHeight = clampNumber(viewportWidth * 0.15, 150, 280, 200);
+  const preferredHeight = baseHeight * priorityScale(photo.priority);
+  const minHeight = clampNumber(viewportWidth * 0.115, 118, 185, 150) * (0.92 + photo.priority * 0.018);
+  const maxHeight = Math.min(
+    viewportHeight * 0.5,
+    preferredHeight * 1.34,
+    clampNumber(viewportWidth * 0.36, 280, 480, 360)
+  );
+  const maxWidth = Math.min(
+    containerWidth * (0.3 + photo.priority * 0.025),
+    viewportWidth * 0.54,
+    maxHeight * aspect
+  );
+  const minWidth = minHeight * aspect;
+
+  return { aspect, preferredHeight, minWidth, maxWidth };
+}
+
+function displayWidth(photo, containerWidth, viewportWidth, viewportHeight) {
+  const { aspect, preferredHeight, minWidth, maxWidth } = tileBounds(photo, containerWidth, viewportWidth, viewportHeight);
   const jitter = 0.94 + (hashString(`${photo.id}-${photo.locationIndex}`) % 15) / 100;
   const preferredWidth = preferredHeight * aspect * jitter;
-  const minWidth = clampNumber(viewportWidth * 0.18, 150, 230, 180);
 
-  return Math.round(clampNumber(preferredWidth, minWidth, Math.max(minWidth, Math.min(maxWidth, maxHeightWidth)), 200));
+  return Math.round(clampNumber(preferredWidth, minWidth, Math.max(minWidth, maxWidth), 200));
 }
 
 function rowTargetWidth(rowIndex, containerWidth) {
   return containerWidth * (0.92 + ((rowIndex % 3) * 0.025));
 }
 
-function scaleRow(row, rowIndex, containerWidth, gap) {
+function scaleRow(row, rowIndex, containerWidth, viewportWidth, viewportHeight, gap) {
   const targetWidth = rowTargetWidth(rowIndex, containerWidth);
   let widths = row.map((tile) => tile.width);
   let total = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, row.length - 1);
@@ -98,7 +112,7 @@ function scaleRow(row, rowIndex, containerWidth, gap) {
   while (remaining > 1 && iterations < 4) {
     const growable = row
       .map((tile, index) => {
-        const maxWidth = containerWidth * (0.36 + (tile.photo.priority / 10) * 0.18);
+        const { maxWidth } = tileBounds(tile.photo, containerWidth, viewportWidth, viewportHeight);
         return { index, room: Math.max(0, maxWidth - widths[index]), weight: tile.photo.priority };
       })
       .filter((item) => item.room > 0);
@@ -135,7 +149,7 @@ function layoutRows(photos) {
     const rowTarget = rowTargetWidth(rows.length, containerWidth);
     const nextWidth = currentWidth + width + (current.length ? gap : 0);
     if (current.length && nextWidth > rowTarget) {
-      rows.push(scaleRow(current, rows.length, containerWidth, gap));
+      rows.push(scaleRow(current, rows.length, containerWidth, viewportWidth, viewportHeight, gap));
       current = [tile];
       currentWidth = width;
       return;
@@ -145,7 +159,7 @@ function layoutRows(photos) {
     currentWidth = nextWidth;
   });
 
-  if (current.length) rows.push(scaleRow(current, rows.length, containerWidth, gap));
+  if (current.length) rows.push(scaleRow(current, rows.length, containerWidth, viewportWidth, viewportHeight, gap));
   return rows;
 }
 
