@@ -330,31 +330,35 @@ if ($action === 'upload') {
 if ($action === 'save') {
     $data = isset($input['data']) && is_array($input['data']) ? $input['data'] : $input;
     $cleanPhotos = [];
+    $landingSelected = false;
     foreach (($data['photos'] ?? []) as $photo) {
         if (!is_array($photo)) {
             continue;
         }
         $fileName = clean_text($photo['fileName'] ?? basename((string) ($photo['url'] ?? '')));
-        $displayFileName = clean_text($photo['displayFileName'] ?? basename((string) ($photo['displayUrl'] ?? '')));
-        $previewFileName = clean_text($photo['previewFileName'] ?? basename((string) ($photo['previewUrl'] ?? '')));
-        $thumbFileName = clean_text($photo['thumbFileName'] ?? basename((string) ($photo['thumbUrl'] ?? '')));
-        $displayUrl = $displayFileName !== '' ? derivative_url($host, 'display', $displayFileName) : photo_url($host, $fileName);
-        $previewUrl = $previewFileName !== '' ? derivative_url($host, 'display', $previewFileName) : $displayUrl;
-        $thumbUrl = $thumbFileName !== '' ? derivative_url($host, 'thumbs', $thumbFileName) : photo_url($host, $fileName);
+        $derivatives = ['displayFileName' => null, 'displayUrl' => photo_url($host, $fileName), 'previewFileName' => null, 'previewUrl' => photo_url($host, $fileName), 'thumbFileName' => null, 'thumbUrl' => photo_url($host, $fileName)];
+        if ($fileName !== '' && is_file($photosDir . '/' . $fileName)) {
+            $derivatives = ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName);
+        }
+        $isLanding = !$landingSelected && (($photo['isLanding'] ?? false) === true);
+        if ($isLanding) {
+            $landingSelected = true;
+        }
         $cleanPhotos[] = [
             'id' => clean_text($photo['id'] ?? bin2hex(random_bytes(8))),
             'fileName' => $fileName,
             'url' => photo_url($host, $fileName),
-            'displayFileName' => $displayFileName !== '' ? $displayFileName : null,
-            'displayUrl' => $displayUrl,
-            'previewFileName' => $previewFileName !== '' ? $previewFileName : null,
-            'previewUrl' => $previewUrl,
-            'thumbFileName' => $thumbFileName !== '' ? $thumbFileName : null,
-            'thumbUrl' => $thumbUrl,
+            'displayFileName' => $derivatives['displayFileName'],
+            'displayUrl' => $derivatives['displayUrl'],
+            'previewFileName' => $derivatives['previewFileName'],
+            'previewUrl' => $derivatives['previewUrl'],
+            'thumbFileName' => $derivatives['thumbFileName'],
+            'thumbUrl' => $derivatives['thumbUrl'],
             'location' => clean_text($photo['location'] ?? ''),
             'date' => clean_text($photo['date'] ?? ''),
             'priority' => number_between($photo['priority'] ?? 5, 1, 10, 5),
             'locationIndex' => number_between($photo['locationIndex'] ?? 50, 1, 100, 50),
+            'isLanding' => $isLanding,
             'caption' => clean_text($photo['caption'] ?? ''),
             'latitude' => is_numeric($photo['latitude'] ?? null) ? (float) $photo['latitude'] : null,
             'longitude' => is_numeric($photo['longitude'] ?? null) ? (float) $photo['longitude'] : null,

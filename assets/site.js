@@ -23,6 +23,7 @@ function normalizePhotos(payload) {
       date: photo.date || "",
       priority: clampNumber(photo.priority, 1, 10, 5),
       locationIndex: clampNumber(photo.locationIndex, 1, 100, index + 1),
+      isLanding: photo.isLanding === true,
       aspectRatio: Number(photo.aspectRatio) || null,
       caption: photo.caption || ""
     }))
@@ -72,7 +73,7 @@ function renderGallery(photos) {
     return;
   }
 
-  const heroPhoto = [...photos].sort((a, b) => b.priority - a.priority || a.locationIndex - b.locationIndex)[0];
+  const heroPhoto = photos.find((photo) => photo.isLanding) || [...photos].sort((a, b) => b.priority - a.priority || a.locationIndex - b.locationIndex)[0];
   heroImage.style.backgroundImage = `linear-gradient(180deg, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.72)), url("${heroPhoto.displayUrl}")`;
 
   const observer = new IntersectionObserver((entries) => {

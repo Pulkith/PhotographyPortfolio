@@ -41,6 +41,7 @@ function normalize(payload) {
     date: photo.date || "",
     priority: clamp(photo.priority, 1, 10, 5),
     locationIndex: clamp(photo.locationIndex, 1, 100, index + 1),
+    isLanding: photo.isLanding === true,
     caption: photo.caption || "",
     latitude: photo.latitude !== null && photo.latitude !== undefined && photo.latitude !== "" && Number.isFinite(Number(photo.latitude)) ? Number(photo.latitude) : null,
     longitude: photo.longitude !== null && photo.longitude !== undefined && photo.longitude !== "" && Number.isFinite(Number(photo.longitude)) ? Number(photo.longitude) : null,
@@ -124,6 +125,7 @@ function renderList() {
           ${fieldHtml("caption", "Caption", photo.caption, "wide-field")}
         </div>
         <div class="admin-actions">
+          <button data-action="landing" type="button">${photo.isLanding ? "Landing Image" : "Set Landing"}</button>
           <button class="drag-handle" type="button" title="Drag this row">Drag</button>
           <button data-action="up" type="button">Up</button>
           <button data-action="down" type="button">Down</button>
@@ -143,6 +145,7 @@ function renderList() {
     item.querySelector('[data-action="up"]').addEventListener("click", () => movePhoto(index, -1));
     item.querySelector('[data-action="down"]').addEventListener("click", () => movePhoto(index, 1));
     item.querySelector('[data-action="delete"]').addEventListener("click", () => deletePhoto(photo.id));
+    item.querySelector('[data-action="landing"]').addEventListener("click", () => setLandingPhoto(photo.id));
     item.addEventListener("dragstart", () => {
       draggedId = photo.id;
       item.classList.add("dragging");
@@ -155,6 +158,15 @@ function renderList() {
     });
     photoList.appendChild(item);
   });
+}
+
+function setLandingPhoto(id) {
+  photos = photos.map((photo) => ({
+    ...photo,
+    isLanding: photo.id === id
+  }));
+  renderList();
+  saveChanges();
 }
 
 function fieldHtml(key, label, value, className = "", type = "text", min = "", max = "") {
@@ -227,10 +239,19 @@ function payload() {
   return {
     updatedAt: new Date().toISOString(),
     photos: photos.map((photo) => ({
-      ...photo,
+      id: photo.id,
+      fileName: photo.fileName,
+      url: absoluteUrl(photo.url || photo.fileName),
+      location: photo.location,
+      date: photo.date,
       priority: clamp(photo.priority, 1, 10, 5),
       locationIndex: clamp(photo.locationIndex, 1, 100, 50),
-      url: absoluteUrl(photo.url || photo.fileName)
+      isLanding: photo.isLanding === true,
+      caption: photo.caption,
+      latitude: photo.latitude,
+      longitude: photo.longitude,
+      aspectRatio: photo.aspectRatio,
+      uploadedAt: photo.uploadedAt
     })).sort(sortPhotos)
   };
 }
