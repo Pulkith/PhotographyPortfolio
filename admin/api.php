@@ -33,6 +33,18 @@ $indexPath = $photosDir . '/index.json';
 $authPath = $photosDir . '/.admin-sessions.json';
 $adminPassword = env_value('ADMIN_PASSWORD', __DIR__ . '/../.env');
 
+$optimizationTargets = [
+    'display' => ['folder' => 'display', 'suffix' => 'display-1080', 'width' => 1080, 'quality' => 72],
+    'preview' => ['folder' => 'display', 'suffix' => 'preview-540', 'width' => 540, 'quality' => 62],
+    'thumb' => ['folder' => 'thumbs', 'suffix' => 'thumb-220', 'width' => 220, 'quality' => 52]
+];
+
+$legacyDerivativeSuffixes = [
+    'display-720', 'display-1080', 'display-1440', 'display-1800', 'display-2400',
+    'preview-360', 'preview-540', 'preview-720', 'preview-960', 'preview-1400',
+    'thumb-140', 'thumb-220', 'thumb-320', 'thumb-480', 'thumb-640'
+];
+
 function auth_cookie_name() {
     return 'photography_admin_auth';
 }
@@ -238,24 +250,12 @@ function cleanup_photo_files($photosDir, $fileName) {
         return;
     }
 
-    $paths = [
-        $photosDir . '/' . $fileName,
-        $photosDir . '/display/' . derivative_name($fileName, 'display-720'),
-        $photosDir . '/display/' . derivative_name($fileName, 'display-1080'),
-        $photosDir . '/display/' . derivative_name($fileName, 'display-1440'),
-        $photosDir . '/display/' . derivative_name($fileName, 'display-2400'),
-        $photosDir . '/display/' . derivative_name($fileName, 'display-1800'),
-        $photosDir . '/display/' . derivative_name($fileName, 'preview-360'),
-        $photosDir . '/display/' . derivative_name($fileName, 'preview-540'),
-        $photosDir . '/display/' . derivative_name($fileName, 'preview-720'),
-        $photosDir . '/display/' . derivative_name($fileName, 'preview-960'),
-        $photosDir . '/display/' . derivative_name($fileName, 'preview-1400'),
-        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-140'),
-        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-220'),
-        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-320'),
-        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-480'),
-        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-640')
-    ];
+    global $legacyDerivativeSuffixes;
+    $paths = [$photosDir . '/' . $fileName];
+    foreach ($legacyDerivativeSuffixes as $suffix) {
+        $folder = strpos($suffix, 'thumb-') === 0 ? 'thumbs' : 'display';
+        $paths[] = $photosDir . '/' . $folder . '/' . derivative_name($fileName, $suffix);
+    }
     foreach ($paths as $path) {
         if (is_file($path)) {
             unlink($path);
@@ -467,16 +467,17 @@ function derivative_failure_reason($sourcePath, $targetPath) {
 }
 
 function ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName) {
+    global $optimizationTargets;
     $sourcePath = $photosDir . '/' . basename($fileName);
-    $displayName = derivative_name($fileName, 'display-720');
-    $previewName = derivative_name($fileName, 'preview-360');
-    $thumbName = derivative_name($fileName, 'thumb-140');
+    $displayName = derivative_name($fileName, $optimizationTargets['display']['suffix']);
+    $previewName = derivative_name($fileName, $optimizationTargets['preview']['suffix']);
+    $thumbName = derivative_name($fileName, $optimizationTargets['thumb']['suffix']);
     $displayPath = $displayDir . '/' . $displayName;
     $previewPath = $displayDir . '/' . $previewName;
     $thumbPath = $thumbDir . '/' . $thumbName;
-    $createdDisplay = is_file($displayPath) || save_resized_jpeg($sourcePath, $displayPath, 720, 60);
-    $createdPreview = is_file($previewPath) || save_resized_jpeg($sourcePath, $previewPath, 360, 48);
-    $createdThumb = is_file($thumbPath) || save_resized_jpeg($sourcePath, $thumbPath, 140, 38);
+    $createdDisplay = is_file($displayPath) || save_resized_jpeg($sourcePath, $displayPath, $optimizationTargets['display']['width'], $optimizationTargets['display']['quality']);
+    $createdPreview = is_file($previewPath) || save_resized_jpeg($sourcePath, $previewPath, $optimizationTargets['preview']['width'], $optimizationTargets['preview']['quality']);
+    $createdThumb = is_file($thumbPath) || save_resized_jpeg($sourcePath, $thumbPath, $optimizationTargets['thumb']['width'], $optimizationTargets['thumb']['quality']);
 
     return [
         'displayFileName' => $createdDisplay ? $displayName : null,
@@ -745,6 +746,7 @@ if ($action === 'optimize') {
 }
 
 if ($action === 'clientOptimize') {
+    global $optimizationTargets;
     $id = clean_text($input['id'] ?? '');
     if ($id === '') {
         fail('Missing photo id.');
@@ -767,9 +769,9 @@ if ($action === 'clientOptimize') {
     }
 
     $uploads = [
-        'display' => [$displayDir, derivative_name($fileName, 'display-720')],
-        'preview' => [$displayDir, derivative_name($fileName, 'preview-360')],
-        'thumb' => [$thumbDir, derivative_name($fileName, 'thumb-140')]
+        'display' => [$displayDir, derivative_name($fileName, $optimizationTargets['display']['suffix'])],
+        'preview' => [$displayDir, derivative_name($fileName, $optimizationTargets['preview']['suffix'])],
+        'thumb' => [$thumbDir, derivative_name($fileName, $optimizationTargets['thumb']['suffix'])]
     ];
 
     foreach ($uploads as $field => [$targetDir, $targetName]) {
@@ -786,9 +788,9 @@ if ($action === 'clientOptimize') {
         }
     }
 
-    $displayName = derivative_name($fileName, 'display-720');
-    $previewName = derivative_name($fileName, 'preview-360');
-    $thumbName = derivative_name($fileName, 'thumb-140');
+    $displayName = derivative_name($fileName, $optimizationTargets['display']['suffix']);
+    $previewName = derivative_name($fileName, $optimizationTargets['preview']['suffix']);
+    $thumbName = derivative_name($fileName, $optimizationTargets['thumb']['suffix']);
     $index['photos'][$photoIndex]['displayFileName'] = $displayName;
     $index['photos'][$photoIndex]['displayUrl'] = derivative_url($host, 'display', $displayName);
     $index['photos'][$photoIndex]['previewFileName'] = $previewName;

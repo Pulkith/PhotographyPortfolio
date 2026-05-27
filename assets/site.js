@@ -1,6 +1,13 @@
 const HOST = "https://photography.pulkith.com";
 const INDEX_URL = `${HOST}/photos/index.json`;
 const API_INDEX_URL = `${HOST}/admin/api.php?action=list`;
+const IMAGE_WIDTHS = {
+  thumb: 220,
+  preview: 540,
+  display: 1080,
+  galleryMax: 540,
+  lightboxMax: 1080
+};
 
 const gallery = document.querySelector("#gallery");
 const heroImage = document.querySelector("#heroImage");
@@ -44,9 +51,9 @@ function responsiveUrls(photo) {
   const previewUrl = absolutePhotoUrl(photo.previewUrl || photo.displayUrl || photo.url);
   const thumbUrl = absolutePhotoUrl(photo.thumbUrl || photo.previewUrl || photo.displayUrl || photo.url);
   return [
-    { url: thumbUrl, width: 140 },
-    { url: previewUrl, width: 360 },
-    { url: displayUrl, width: 720 }
+    { url: thumbUrl, width: IMAGE_WIDTHS.thumb },
+    { url: previewUrl, width: IMAGE_WIDTHS.preview },
+    { url: displayUrl, width: IMAGE_WIDTHS.display }
   ];
 }
 
@@ -237,7 +244,7 @@ function renderGallery(photos) {
       button.style.width = `${width}px`;
       const sourceUrl = photo.thumbUrl;
       button.innerHTML = `
-        <img src="${sourceUrl}" srcset="${srcset(photo)}" sizes="${Math.min(Math.ceil(width), 360)}px" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex < 2 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
+        <img src="${sourceUrl}" srcset="${srcset(photo)}" sizes="${Math.min(Math.ceil(width), IMAGE_WIDTHS.galleryMax)}px" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex < 2 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
         <span class="photo-meta">
           <span>${escapeHtml(photo.location)}</span>
           <span>${escapeHtml(photo.date)}</span>
@@ -305,7 +312,7 @@ function openLightbox(index) {
   if (!renderedPhotos.length || index < 0) return;
   activePhotoIndex = (index + renderedPhotos.length) % renderedPhotos.length;
   const photo = renderedPhotos[activePhotoIndex];
-  setImageSource(lightboxImage, photo, "min(100vw, 720px)", photo.previewUrl);
+  setImageSource(lightboxImage, photo, `min(100vw, ${IMAGE_WIDTHS.lightboxMax}px)`, photo.previewUrl);
   lightboxImage.alt = photo.caption || `${photo.location} photograph`;
   lightboxLocation.textContent = photo.location;
   lightboxDate.textContent = photo.date;

@@ -1,6 +1,11 @@
 const HOST = "https://photography.pulkith.com";
 const API_URL = `${HOST}/admin/api.php`;
 const INDEX_URL = `${API_URL}?action=list`;
+const OPTIMIZATION_TARGETS = {
+  display: { width: 1080, quality: 0.72 },
+  preview: { width: 540, quality: 0.62 },
+  thumb: { width: 220, quality: 0.52 }
+};
 
 const adminLock = document.querySelector("#adminLock");
 const loginForm = document.querySelector("#loginForm");
@@ -529,9 +534,9 @@ async function clientOptimizePhoto(photo) {
   const formData = new FormData();
   formData.append("action", "clientOptimize");
   formData.append("id", photo.id);
-  formData.append("display", await resizedJpegBlob(image, 720, 0.6), "display.jpg");
-  formData.append("preview", await resizedJpegBlob(image, 360, 0.48), "preview.jpg");
-  formData.append("thumb", await resizedJpegBlob(image, 140, 0.38), "thumb.jpg");
+  formData.append("display", await resizedJpegBlob(image, OPTIMIZATION_TARGETS.display.width, OPTIMIZATION_TARGETS.display.quality), "display.jpg");
+  formData.append("preview", await resizedJpegBlob(image, OPTIMIZATION_TARGETS.preview.width, OPTIMIZATION_TARGETS.preview.quality), "preview.jpg");
+  formData.append("thumb", await resizedJpegBlob(image, OPTIMIZATION_TARGETS.thumb.width, OPTIMIZATION_TARGETS.thumb.quality), "thumb.jpg");
   return apiPost(formData);
 }
 
