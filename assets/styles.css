@@ -326,6 +326,34 @@ h2 {
   object-fit: contain;
 }
 
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  width: clamp(44px, 5vw, 58px);
+  height: clamp(58px, 8vw, 82px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.34);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(42px, 6vw, 64px);
+  line-height: 1;
+  transform: translateY(-50%);
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.34);
+  transform: translateY(-50%) scale(1.04);
+}
+
+.lightbox-prev {
+  left: clamp(10px, 2vw, 24px);
+}
+
+.lightbox-next {
+  right: clamp(10px, 2vw, 24px);
+}
+
 .lightbox-caption {
   display: flex;
   justify-content: space-between;

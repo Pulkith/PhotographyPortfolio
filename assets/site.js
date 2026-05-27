@@ -8,8 +8,12 @@ const lightboxImage = document.querySelector("#lightboxImage");
 const lightboxLocation = document.querySelector("#lightboxLocation");
 const lightboxDate = document.querySelector("#lightboxDate");
 const closeLightbox = document.querySelector("#closeLightbox");
+const prevLightbox = document.querySelector("#prevLightbox");
+const nextLightbox = document.querySelector("#nextLightbox");
 let renderedPhotos = [];
 let resizeFrame = null;
+let activePhotoIndex = -1;
+const preloadedImages = new Set();
 
 function normalizePhotos(payload) {
   const photos = Array.isArray(payload) ? payload : payload?.photos;
@@ -217,7 +221,7 @@ function renderGallery(photos) {
           <span>${escapeHtml(photo.date)}</span>
         </span>
       `;
-      button.addEventListener("click", () => openLightbox(photo));
+      button.addEventListener("click", () => openLightbox(renderedPhotos.findIndex((item) => item.id === photo.id)));
       rowEl.appendChild(button);
       observer.observe(button);
     });
@@ -225,26 +229,52 @@ function renderGallery(photos) {
   });
 }
 
-function openLightbox(photo) {
+function photoAtOffset(offset) {
+  if (!renderedPhotos.length || activePhotoIndex < 0) return null;
+  const index = (activePhotoIndex + offset + renderedPhotos.length) % renderedPhotos.length;
+  return renderedPhotos[index];
+}
+
+function preloadLightboxNeighbors() {
+  [-1, 1].forEach((offset) => {
+    const photo = photoAtOffset(offset);
+    if (!photo || preloadedImages.has(photo.displayUrl)) return;
+    const image = new Image();
+    image.src = photo.displayUrl;
+    preloadedImages.add(photo.displayUrl);
+  });
+}
+
+function openLightbox(index) {
+  if (!renderedPhotos.length || index < 0) return;
+  activePhotoIndex = (index + renderedPhotos.length) % renderedPhotos.length;
+  const photo = renderedPhotos[activePhotoIndex];
   lightboxImage.src = photo.displayUrl;
   lightboxImage.alt = photo.caption || `${photo.location} photograph`;
   lightboxLocation.textContent = photo.location;
   lightboxDate.textContent = photo.date;
   lightbox.classList.add("open");
   document.body.style.overflow = "hidden";
+  preloadLightboxNeighbors();
 
   const original = new Image();
   original.onload = () => {
-    if (lightbox.classList.contains("open")) {
+    if (lightbox.classList.contains("open") && renderedPhotos[activePhotoIndex]?.id === photo.id) {
       lightboxImage.src = photo.url;
     }
   };
   original.src = photo.url;
 }
 
+function moveLightbox(delta) {
+  if (!lightbox.classList.contains("open")) return;
+  openLightbox(activePhotoIndex + delta);
+}
+
 function closeViewer() {
   lightbox.classList.remove("open");
   lightboxImage.removeAttribute("src");
+  activePhotoIndex = -1;
   document.body.style.overflow = "";
 }
 
@@ -276,11 +306,15 @@ window.addEventListener("resize", () => {
 });
 
 closeLightbox.addEventListener("click", closeViewer);
+prevLightbox.addEventListener("click", () => moveLightbox(-1));
+nextLightbox.addEventListener("click", () => moveLightbox(1));
 lightbox.addEventListener("click", (event) => {
   if (event.target === lightbox) closeViewer();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeViewer();
+  if (event.key === "ArrowLeft") moveLightbox(-1);
+  if (event.key === "ArrowRight") moveLightbox(1);
 });
 
 loadPhotos();

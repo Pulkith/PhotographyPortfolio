@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;650;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/styles.css?v=20260527-flow6">
+    <link rel="stylesheet" href="assets/styles.css?v=20260527-lightbox-nav">
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -108,13 +108,15 @@
 
     <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
       <button class="icon-button" id="closeLightbox" aria-label="Close viewer">&times;</button>
+      <button class="lightbox-nav lightbox-prev" id="prevLightbox" type="button" aria-label="Previous image">&lsaquo;</button>
       <img id="lightboxImage" alt="">
+      <button class="lightbox-nav lightbox-next" id="nextLightbox" type="button" aria-label="Next image">&rsaquo;</button>
       <div class="lightbox-caption">
         <span id="lightboxLocation"></span>
         <span id="lightboxDate"></span>
       </div>
     </div>
 
-    <script src="assets/site.js?v=20260527-flow6"></script>
+    <script src="assets/site.js?v=20260527-lightbox-nav"></script>
   </body>
 </html>
