@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Photography Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;650;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/styles.css">
+  </head>
+  <body class="admin-body">
+    <main class="admin-shell">
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">Admin</p>
+          <h1>Portfolio Control</h1>
+        </div>
+        <a href="../">View public site</a>
+      </header>
+
+      <div class="admin-layout">
+        <section class="admin-panel">
+          <h2>Upload Original</h2>
+          <form id="uploadForm">
+            <label class="field">
+              Photo file
+              <input id="fileInput" name="photo" type="file" accept="image/*" required>
+            </label>
+            <label class="field">
+              Location
+              <input id="locationInput" name="location" placeholder="Dallas, TX" required>
+            </label>
+            <div class="form-grid">
+              <label class="field">
+                Date
+                <input id="dateInput" name="date" type="date" required>
+              </label>
+              <label class="field">
+                Location index
+                <input id="locationIndexInput" name="locationIndex" type="number" min="1" max="100" value="50" required>
+              </label>
+            </div>
+            <label class="field">
+              Priority
+              <input id="priorityInput" name="priority" type="range" min="1" max="10" value="5">
+            </label>
+            <label class="field">
+              Caption
+              <textarea id="captionInput" name="caption" placeholder="Optional alt text or note"></textarea>
+            </label>
+            <div class="button-row">
+              <button class="primary-button" type="submit">Upload</button>
+              <button class="secondary-button" id="refreshButton" type="button">Refresh</button>
+            </div>
+            <p class="status" id="status"></p>
+          </form>
+
+          <div class="admin-divider"></div>
+
+          <h2>Batch Upload</h2>
+          <form id="batchForm" method="post" action="#">
+            <label class="field">
+              Photo files
+              <input id="batchFileInput" type="file" accept="image/*" multiple>
+            </label>
+            <div class="button-row">
+              <button class="primary-button" id="batchUploadButton" type="button">Upload Batch</button>
+            </div>
+            <div class="progress-shell" aria-hidden="true">
+              <div class="progress-bar" id="batchProgressBar"></div>
+            </div>
+            <p class="status" id="batchStatus"></p>
+          </form>
+        </section>
+
+        <section class="admin-panel">
+          <div class="section-heading">
+            <h2>Images</h2>
+            <p class="section-note">Drag rows, use move buttons, or edit fields. Save writes to the hosted photo index through the global API.</p>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" id="saveButton" type="button">Save Changes</button>
+            <button class="secondary-button" id="renumberButton" type="button">Renumber 1-100</button>
+          </div>
+          <p class="status" id="listStatus"></p>
+          <div class="photo-list" id="photoList"></div>
+        </section>
+      </div>
+    </main>
+
+    <script src="admin.js?v=20260527-batch2"></script>
+  </body>
+</html>

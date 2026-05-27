@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pulkith Paruchuri Photography</title>
+    <meta name="description" content="Photography portfolio by Pulkith Paruchuri.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;650;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/styles.css">
+  </head>
+  <body>
+    <nav class="site-nav" aria-label="Primary">
+      <a class="brand" href="#">Pulkith Paruchuri</a>
+      <div class="nav-links">
+        <a href="#portfolio">Portfolio</a>
+        <a href="#gear">Gear</a>
+        <a href="#contact">Contact</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="hero-image" id="heroImage" aria-hidden="true"></div>
+      <div class="hero-content">
+        <p class="eyebrow">Photography</p>
+        <h1>Pulkith Paruchuri</h1>
+        <p class="hero-subtitle">Frames from Dallas, Philadelphia, New York City, and everywhere light makes a scene worth keeping.</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="section" id="portfolio">
+        <div class="section-heading">
+          <h2>Portfolio</h2>
+          <p class="section-note">A priority-weighted masonry edit, ordered by location index and opened at full uploaded quality.</p>
+        </div>
+        <div class="gallery" id="gallery" aria-live="polite"></div>
+      </section>
+
+      <section class="gear-band" id="gear">
+        <div class="section">
+          <div class="section-heading">
+            <h2>Camera & Field Kit</h2>
+            <p class="section-note">A compact working kit for high-resolution stills, travel, low light, street, and landscape work.</p>
+          </div>
+          <div class="gear-grid">
+            <article class="gear-card">
+              <h3>Camera</h3>
+              <p>Full-frame mirrorless body, shot in RAW whenever possible for maximum editing latitude and export quality.</p>
+            </article>
+            <article class="gear-card">
+              <h3>Lenses</h3>
+              <p>Fast primes for night and portrait work, plus a standard zoom for travel, architecture, and fast-moving days.</p>
+            </article>
+            <article class="gear-card">
+              <h3>Workflow</h3>
+              <p>Original uploads are preserved. The site displays the uploaded source file and opens the same file in the viewer.</p>
+            </article>
+            <article class="gear-card">
+              <h3>Locations</h3>
+              <p>Based around Dallas, Philadelphia, and New York City, with room for assignments and travel.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section contact" id="contact">
+        <div>
+          <p class="eyebrow">Contact</p>
+          <h2>Available in Dallas, Philadelphia, and NYC.</h2>
+          <p>For prints, collaborations, shoots, and licensing, reach out by email.</p>
+        </div>
+        <a href="mailto:paruchuri@pulkith.com">paruchuri@pulkith.com</a>
+      </section>
+    </main>
+
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+      <button class="icon-button" id="closeLightbox" aria-label="Close viewer">&times;</button>
+      <img id="lightboxImage" alt="">
+      <div class="lightbox-caption">
+        <span id="lightboxLocation"></span>
+        <span id="lightboxDate"></span>
+      </div>
+    </div>
+
+    <script src="assets/site.js"></script>
+  </body>
+</html>
