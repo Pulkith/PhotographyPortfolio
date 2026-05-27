@@ -13,6 +13,7 @@ const batchStatus = document.querySelector("#batchStatus");
 const batchProgressBar = document.querySelector("#batchProgressBar");
 const listStatus = document.querySelector("#listStatus");
 const photoList = document.querySelector("#photoList");
+const toast = document.querySelector("#toast");
 const saveButton = document.querySelector("#saveButton");
 const refreshButton = document.querySelector("#refreshButton");
 const renumberButton = document.querySelector("#renumberButton");
@@ -24,6 +25,7 @@ let photos = [];
 let draggedId = null;
 let batchUploading = false;
 let authToken = localStorage.getItem("photographyAdminToken") || "";
+let toastTimer = null;
 
 document.body.classList.add("admin-locked");
 
@@ -58,7 +60,34 @@ function normalize(payload) {
 }
 
 function sortPhotos(a, b) {
-  return a.locationIndex - b.locationIndex || b.priority - a.priority;
+  const dateCompare = dateValue(b.date) - dateValue(a.date);
+  return dateCompare || a.locationIndex - b.locationIndex || b.priority - a.priority;
+}
+
+function dateValue(date) {
+  const parsed = Date.parse(`${date || ""}T00:00:00`);
+  return Number.isFinite(parsed) ? parsed : -Infinity;
+}
+
+function sameDate(a, b) {
+  return (a?.date || "") === (b?.date || "");
+}
+
+function showOrderError() {
+  showToast("Images can only be reordered within the same date.");
+}
+
+function showToast(message) {
+  if (!toast) {
+    setStatus(message, listStatus);
+    return;
+  }
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2800);
 }
 
 function absoluteUrl(value) {
@@ -209,7 +238,7 @@ function renderList() {
         <div class="admin-fields">
           ${fieldHtml("location", "Location", photo.location, "wide-field")}
           ${fieldHtml("date", "Date", photo.date, "", "date")}
-          ${fieldHtml("locationIndex", "Index", photo.locationIndex, "", "number", 1, 100)}
+          ${fieldHtml("locationIndex", "Index", photo.locationIndex, "", "number", 1, 100, true)}
           ${fieldHtml("priority", "Priority", photo.priority, "", "number", 1, 10)}
           ${fieldHtml("caption", "Caption", photo.caption, "wide-field")}
         </div>
@@ -258,11 +287,11 @@ function setLandingPhoto(id) {
   saveChanges();
 }
 
-function fieldHtml(key, label, value, className = "", type = "text", min = "", max = "") {
+function fieldHtml(key, label, value, className = "", type = "text", min = "", max = "", disabled = false) {
   return `
     <label class="field ${className}">
       ${label}
-      <input data-key="${key}" type="${type}" value="${escapeHtml(value ?? "")}" ${min !== "" ? `min="${min}"` : ""} ${max !== "" ? `max="${max}"` : ""}>
+      <input data-key="${key}" type="${type}" value="${escapeHtml(value ?? "")}" ${min !== "" ? `min="${min}"` : ""} ${max !== "" ? `max="${max}"` : ""} ${disabled ? "disabled" : ""}>
     </label>
   `;
 }
@@ -280,9 +309,13 @@ function escapeHtml(value) {
 function movePhoto(index, delta) {
   const nextIndex = index + delta;
   if (nextIndex < 0 || nextIndex >= photos.length) return;
+  if (!sameDate(photos[index], photos[nextIndex])) {
+    showOrderError();
+    return;
+  }
   const [photo] = photos.splice(index, 1);
   photos.splice(nextIndex, 0, photo);
-  renumber();
+  renumberDateGroup(photo.date);
   renderList();
 }
 
@@ -291,16 +324,22 @@ function reorderByDrag(sourceId, targetId) {
   const sourceIndex = photos.findIndex((photo) => photo.id === sourceId);
   const targetIndex = photos.findIndex((photo) => photo.id === targetId);
   if (sourceIndex < 0 || targetIndex < 0) return;
+  if (!sameDate(photos[sourceIndex], photos[targetIndex])) {
+    draggedId = null;
+    showOrderError();
+    return;
+  }
   const [photo] = photos.splice(sourceIndex, 1);
   photos.splice(targetIndex, 0, photo);
   draggedId = null;
-  renumber();
+  renumberDateGroup(photo.date);
   renderList();
 }
 
-function renumber() {
-  const step = photos.length > 1 ? 99 / (photos.length - 1) : 0;
-  photos.forEach((photo, index) => {
+function renumberDateGroup(date) {
+  const group = photos.filter((photo) => (photo.date || "") === (date || ""));
+  const step = group.length > 1 ? 99 / (group.length - 1) : 0;
+  group.forEach((photo, index) => {
     photo.locationIndex = Math.round(1 + step * index);
   });
 }
@@ -513,9 +552,7 @@ loginForm?.addEventListener("submit", (event) => {
   login(passwordInput.value);
 });
 renumberButton?.addEventListener("click", () => {
-  renumber();
-  renderList();
-  setStatus("Location indexes renumbered. Save to persist.", listStatus);
+  setStatus("Index is disabled. Reorder images within the same date using drag, Up, or Down.", listStatus);
 });
 
 checkAuth();

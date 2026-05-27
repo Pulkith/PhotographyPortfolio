@@ -163,6 +163,27 @@ function clean_text($value) {
     return trim(strip_tags((string) $value));
 }
 
+function photo_date_value($photo) {
+    $date = $photo['date'] ?? '';
+    if (!is_string($date) || trim($date) === '') {
+        return PHP_INT_MIN;
+    }
+    $timestamp = strtotime($date . ' 00:00:00');
+    return $timestamp === false ? PHP_INT_MIN : $timestamp;
+}
+
+function compare_photos($a, $b) {
+    $dateCompare = photo_date_value($b) <=> photo_date_value($a);
+    if ($dateCompare !== 0) {
+        return $dateCompare;
+    }
+    $indexCompare = ((int) ($a['locationIndex'] ?? 50)) <=> ((int) ($b['locationIndex'] ?? 50));
+    if ($indexCompare !== 0) {
+        return $indexCompare;
+    }
+    return ((int) ($b['priority'] ?? 5)) <=> ((int) ($a['priority'] ?? 5));
+}
+
 function photo_url($host, $fileName) {
     return $host . '/photos/' . rawurlencode($fileName);
 }
@@ -434,9 +455,7 @@ if ($action === 'upload') {
     ];
 
     $index['photos'][] = $photo;
-    usort($index['photos'], function ($a, $b) {
-        return ((int) ($a['locationIndex'] ?? 50)) <=> ((int) ($b['locationIndex'] ?? 50));
-    });
+    usort($index['photos'], 'compare_photos');
     write_index($indexPath, $index);
     respond(read_index($indexPath));
 }
@@ -480,9 +499,7 @@ if ($action === 'save') {
             'uploadedAt' => clean_text($photo['uploadedAt'] ?? gmdate('c'))
         ];
     }
-    usort($cleanPhotos, function ($a, $b) {
-        return ((int) $a['locationIndex']) <=> ((int) $b['locationIndex']);
-    });
+    usort($cleanPhotos, 'compare_photos');
     write_index($indexPath, ['photos' => $cleanPhotos]);
     respond(read_index($indexPath));
 }

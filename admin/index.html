@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;650;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/styles.css?v=20260527-auth">
+    <link rel="stylesheet" href="../assets/styles.css?v=20260527-dateorder">
   </head>
   <body class="admin-body">
     <div class="admin-lock" id="adminLock">
@@ -51,7 +51,7 @@
               </label>
               <label class="field">
                 Location index
-                <input id="locationIndexInput" name="locationIndex" type="number" min="1" max="100" value="50" required>
+                <input id="locationIndexInput" name="locationIndex" type="number" min="1" max="100" value="50" disabled>
               </label>
             </div>
             <label class="field">
@@ -94,7 +94,7 @@
           </div>
           <div class="button-row">
             <button class="primary-button" id="saveButton" type="button">Save Changes</button>
-            <button class="secondary-button" id="renumberButton" type="button">Renumber 1-100</button>
+            <button class="secondary-button" id="renumberButton" type="button" disabled>Renumber 1-100</button>
             <button class="secondary-button" id="optimizeButton" type="button">Optimize Existing</button>
             <button class="secondary-button" id="deriveMetadataButton" type="button">Derive Metadata</button>
           </div>
@@ -103,7 +103,8 @@
         </section>
       </div>
     </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="admin.js?v=20260527-auth4"></script>
+    <script src="admin.js?v=20260527-dateorder"></script>
   </body>
 </html>

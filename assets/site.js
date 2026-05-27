@@ -27,7 +27,17 @@ function normalizePhotos(payload) {
       aspectRatio: Number(photo.aspectRatio) || null,
       caption: photo.caption || ""
     }))
-    .sort((a, b) => a.locationIndex - b.locationIndex || b.priority - a.priority);
+    .sort(sortPhotos);
+}
+
+function sortPhotos(a, b) {
+  const dateCompare = dateValue(b.date) - dateValue(a.date);
+  return dateCompare || a.locationIndex - b.locationIndex || b.priority - a.priority;
+}
+
+function dateValue(date) {
+  const parsed = Date.parse(`${date || ""}T00:00:00`);
+  return Number.isFinite(parsed) ? parsed : -Infinity;
 }
 
 function absolutePhotoUrl(url) {
