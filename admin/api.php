@@ -86,6 +86,107 @@ function derivative_name($fileName, $suffix) {
     return $base . '-' . $suffix . '.jpg';
 }
 
+function rational_to_float($value) {
+    if (is_array($value)) {
+        $value = reset($value);
+    }
+    if (is_string($value) && strpos($value, '/') !== false) {
+        [$numerator, $denominator] = array_map('floatval', explode('/', $value, 2));
+        return $denominator == 0.0 ? 0.0 : $numerator / $denominator;
+    }
+    return (float) $value;
+}
+
+function gps_to_decimal($coordinate, $hemisphere) {
+    if (!is_array($coordinate) || count($coordinate) < 3) {
+        return null;
+    }
+    $degrees = rational_to_float($coordinate[0]);
+    $minutes = rational_to_float($coordinate[1]);
+    $seconds = rational_to_float($coordinate[2]);
+    $decimal = $degrees + ($minutes / 60) + ($seconds / 3600);
+    if ($hemisphere === 'S' || $hemisphere === 'W') {
+        $decimal *= -1;
+    }
+    return round($decimal, 6);
+}
+
+function exif_taken_date($exif) {
+    $raw = $exif['DateTimeOriginal'] ?? $exif['DateTimeDigitized'] ?? $exif['DateTime'] ?? '';
+    if (!is_string($raw) || trim($raw) === '') {
+        return '';
+    }
+    $date = DateTime::createFromFormat('Y:m:d H:i:s', trim($raw));
+    return $date ? $date->format('Y-m-d') : '';
+}
+
+function exif_gps($exif) {
+    if (!isset($exif['GPSLatitude'], $exif['GPSLatitudeRef'], $exif['GPSLongitude'], $exif['GPSLongitudeRef'])) {
+        return null;
+    }
+    $latitude = gps_to_decimal($exif['GPSLatitude'], (string) $exif['GPSLatitudeRef']);
+    $longitude = gps_to_decimal($exif['GPSLongitude'], (string) $exif['GPSLongitudeRef']);
+    if ($latitude === null || $longitude === null) {
+        return null;
+    }
+    return ['latitude' => $latitude, 'longitude' => $longitude];
+}
+
+function reverse_geocode_location($latitude, $longitude) {
+    $url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&lat='
+        . rawurlencode((string) $latitude) . '&lon=' . rawurlencode((string) $longitude);
+    $context = stream_context_create([
+        'http' => [
+            'timeout' => 4,
+            'header' => "User-Agent: PulkithPhotographyPortfolio/1.0 (paruchuri@pulkith.com)\r\n"
+        ]
+    ]);
+    $response = @file_get_contents($url, false, $context);
+    if ($response === false) {
+        return '';
+    }
+    $json = json_decode($response, true);
+    $address = is_array($json) && isset($json['address']) && is_array($json['address']) ? $json['address'] : [];
+    $city = $address['city'] ?? $address['town'] ?? $address['village'] ?? $address['municipality'] ?? $address['county'] ?? '';
+    $region = $address['state'] ?? $address['region'] ?? '';
+    $country = $address['country_code'] ?? $address['country'] ?? '';
+    $parts = array_filter([$city, $region, is_string($country) ? strtoupper($country) : '']);
+    return implode(', ', array_unique($parts));
+}
+
+function extract_photo_metadata($path) {
+    $metadata = [
+        'date' => '',
+        'location' => '',
+        'latitude' => null,
+        'longitude' => null
+    ];
+
+    if (!function_exists('exif_read_data')) {
+        return $metadata;
+    }
+
+    $exif = @exif_read_data($path, null, true, false);
+    if (!is_array($exif)) {
+        return $metadata;
+    }
+    $flat = [];
+    foreach ($exif as $section) {
+        if (is_array($section)) {
+            $flat = array_merge($flat, $section);
+        }
+    }
+
+    $metadata['date'] = exif_taken_date($flat);
+    $gps = exif_gps($flat);
+    if ($gps) {
+        $metadata['latitude'] = $gps['latitude'];
+        $metadata['longitude'] = $gps['longitude'];
+        $metadata['location'] = reverse_geocode_location($gps['latitude'], $gps['longitude']);
+    }
+    return $metadata;
+}
+
 function create_image_resource($path, $mime) {
     if (!function_exists('imagecreatetruecolor')) {
         return null;
@@ -194,6 +295,9 @@ if ($action === 'upload') {
     $width = (int) ($info[0] ?? 0);
     $height = (int) ($info[1] ?? 0);
     $derivatives = ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName);
+    $metadata = extract_photo_metadata($destination);
+    $inputLocation = clean_text($input['location'] ?? '');
+    $inputDate = clean_text($input['date'] ?? '');
     $photo = [
         'id' => bin2hex(random_bytes(8)),
         'fileName' => $fileName,
@@ -204,11 +308,13 @@ if ($action === 'upload') {
         'previewUrl' => $derivatives['previewUrl'],
         'thumbFileName' => $derivatives['thumbFileName'],
         'thumbUrl' => $derivatives['thumbUrl'],
-        'location' => clean_text($input['location'] ?? ''),
-        'date' => clean_text($input['date'] ?? ''),
+        'location' => $inputLocation !== '' ? $inputLocation : $metadata['location'],
+        'date' => $inputDate !== '' ? $inputDate : $metadata['date'],
         'priority' => number_between($input['priority'] ?? 5, 1, 10, 5),
         'locationIndex' => number_between($input['locationIndex'] ?? 50, 1, 100, 50),
         'caption' => clean_text($input['caption'] ?? ''),
+        'latitude' => $metadata['latitude'],
+        'longitude' => $metadata['longitude'],
         'aspectRatio' => $height > 0 ? round($width / $height, 4) : null,
         'uploadedAt' => gmdate('c')
     ];
@@ -250,6 +356,8 @@ if ($action === 'save') {
             'priority' => number_between($photo['priority'] ?? 5, 1, 10, 5),
             'locationIndex' => number_between($photo['locationIndex'] ?? 50, 1, 100, 50),
             'caption' => clean_text($photo['caption'] ?? ''),
+            'latitude' => is_numeric($photo['latitude'] ?? null) ? (float) $photo['latitude'] : null,
+            'longitude' => is_numeric($photo['longitude'] ?? null) ? (float) $photo['longitude'] : null,
             'aspectRatio' => is_numeric($photo['aspectRatio'] ?? null) ? (float) $photo['aspectRatio'] : null,
             'uploadedAt' => clean_text($photo['uploadedAt'] ?? gmdate('c'))
         ];
@@ -307,6 +415,53 @@ if ($action === 'optimize') {
     write_index($indexPath, $index);
     $result = read_index($indexPath);
     $result['optimized'] = $changed;
+    respond($result);
+}
+
+if ($action === 'deriveMetadata') {
+    $changed = 0;
+    $dated = 0;
+    $located = 0;
+    foreach ($index['photos'] as &$photo) {
+        if (!is_array($photo)) {
+            continue;
+        }
+        $fileName = clean_text($photo['fileName'] ?? basename((string) ($photo['url'] ?? '')));
+        $sourcePath = $photosDir . '/' . $fileName;
+        if ($fileName === '' || !is_file($sourcePath)) {
+            continue;
+        }
+
+        $metadata = extract_photo_metadata($sourcePath);
+        $photoChanged = false;
+        if (clean_text($photo['date'] ?? '') === '' && $metadata['date'] !== '') {
+            $photo['date'] = $metadata['date'];
+            $photoChanged = true;
+            $dated += 1;
+        }
+        if (clean_text($photo['location'] ?? '') === '' && $metadata['location'] !== '') {
+            $photo['location'] = $metadata['location'];
+            $photoChanged = true;
+            $located += 1;
+        }
+        if (($photo['latitude'] ?? null) === null && $metadata['latitude'] !== null) {
+            $photo['latitude'] = $metadata['latitude'];
+            $photoChanged = true;
+        }
+        if (($photo['longitude'] ?? null) === null && $metadata['longitude'] !== null) {
+            $photo['longitude'] = $metadata['longitude'];
+            $photoChanged = true;
+        }
+        if ($photoChanged) {
+            $changed += 1;
+        }
+    }
+    unset($photo);
+    write_index($indexPath, $index);
+    $result = read_index($indexPath);
+    $result['metadataDerived'] = $changed;
+    $result['datesDerived'] = $dated;
+    $result['locationsDerived'] = $located;
     respond($result);
 }
 

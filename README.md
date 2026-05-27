@@ -33,4 +33,6 @@ Then open:
 
 Copy this folder to `photography.pulkith.com`. Make sure `photos/` is writable by PHP and keep `photos/index.json` in place. The upload API creates `photos/display/` and `photos/thumbs/` for optimized derivatives while preserving the original uploaded files. PHP GD is required for derivative generation; without it, the site falls back to original files.
 
+The API also reads EXIF metadata when available. It uses `DateTimeOriginal` for the taken date, GPS EXIF for coordinates, and OpenStreetMap Nominatim reverse geocoding for city/region-style locations. PHP EXIF support is required for date/GPS extraction, and outbound HTTPS access is required for reverse geocoding.
+
 The admin intentionally has no authentication because this was requested.

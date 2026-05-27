@@ -14,6 +14,7 @@ const refreshButton = document.querySelector("#refreshButton");
 const renumberButton = document.querySelector("#renumberButton");
 const batchUploadButton = document.querySelector("#batchUploadButton");
 const optimizeButton = document.querySelector("#optimizeButton");
+const deriveMetadataButton = document.querySelector("#deriveMetadataButton");
 
 let photos = [];
 let draggedId = null;
@@ -41,6 +42,8 @@ function normalize(payload) {
     priority: clamp(photo.priority, 1, 10, 5),
     locationIndex: clamp(photo.locationIndex, 1, 100, index + 1),
     caption: photo.caption || "",
+    latitude: photo.latitude !== null && photo.latitude !== undefined && photo.latitude !== "" && Number.isFinite(Number(photo.latitude)) ? Number(photo.latitude) : null,
+    longitude: photo.longitude !== null && photo.longitude !== undefined && photo.longitude !== "" && Number.isFinite(Number(photo.longitude)) ? Number(photo.longitude) : null,
     aspectRatio: Number(photo.aspectRatio) || null,
     uploadedAt: photo.uploadedAt || new Date().toISOString()
   })).sort(sortPhotos);
@@ -270,6 +273,30 @@ async function optimizeExisting() {
   }
 }
 
+async function deriveMetadata() {
+  setStatus("Deriving taken dates and GPS locations from original files...", listStatus);
+  deriveMetadataButton.disabled = true;
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "deriveMetadata" })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    photos = normalize(payload);
+    renderList();
+    setStatus(
+      `Metadata updated on ${payload.metadataDerived || 0} image${payload.metadataDerived === 1 ? "" : "s"}: ${payload.datesDerived || 0} date${payload.datesDerived === 1 ? "" : "s"}, ${payload.locationsDerived || 0} location${payload.locationsDerived === 1 ? "" : "s"}.`,
+      listStatus
+    );
+  } catch (error) {
+    setStatus(`Metadata derivation failed against ${API_URL}.`, listStatus);
+  } finally {
+    deriveMetadataButton.disabled = false;
+  }
+}
+
 uploadForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   setStatus("Uploading original file...");
@@ -354,6 +381,7 @@ document.addEventListener("click", (event) => {
 saveButton?.addEventListener("click", saveChanges);
 refreshButton?.addEventListener("click", loadPhotos);
 optimizeButton?.addEventListener("click", optimizeExisting);
+deriveMetadataButton?.addEventListener("click", deriveMetadata);
 renumberButton?.addEventListener("click", () => {
   renumber();
   renderList();
