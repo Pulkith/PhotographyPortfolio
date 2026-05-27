@@ -27,6 +27,7 @@ function normalizePhotos(payload) {
       displayUrl: absolutePhotoUrl(photo.displayUrl || photo.url),
       previewUrl: absolutePhotoUrl(photo.previewUrl || photo.displayUrl || photo.url),
       thumbUrl: absolutePhotoUrl(photo.thumbUrl || photo.previewUrl || photo.displayUrl || photo.url),
+      responsiveUrls: responsiveUrls(photo),
       location: photo.location || "Location pending",
       date: photo.date || "",
       priority: clampNumber(photo.priority, 1, 10, 5),
@@ -36,6 +37,21 @@ function normalizePhotos(payload) {
       caption: photo.caption || ""
     }))
     .sort(sortPhotos);
+}
+
+function responsiveUrls(photo) {
+  const displayUrl = absolutePhotoUrl(photo.displayUrl || photo.url);
+  const previewUrl = absolutePhotoUrl(photo.previewUrl || photo.displayUrl || photo.url);
+  const thumbUrl = absolutePhotoUrl(photo.thumbUrl || photo.previewUrl || photo.displayUrl || photo.url);
+  return [
+    { url: thumbUrl, width: 320 },
+    { url: previewUrl, width: 720 },
+    { url: displayUrl, width: 1440 }
+  ];
+}
+
+function srcset(photo) {
+  return photo.responsiveUrls.map((item) => `${item.url} ${item.width}w`).join(", ");
 }
 
 function sortPhotos(a, b) {
@@ -198,10 +214,7 @@ function renderGallery(photos) {
   }
 
   const heroPhoto = photos.find((photo) => photo.isLanding) || [...photos].sort((a, b) => b.priority - a.priority || a.locationIndex - b.locationIndex)[0];
-  setHeroImage(heroPhoto.thumbUrl);
-  const heroPreview = new Image();
-  heroPreview.onload = () => setHeroImage(heroPhoto.previewUrl);
-  heroPreview.src = heroPhoto.previewUrl;
+  setFastHero(heroPhoto);
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
@@ -224,7 +237,7 @@ function renderGallery(photos) {
       button.style.width = `${width}px`;
       const sourceUrl = width > 560 || photo.priority >= 8 ? photo.previewUrl : photo.thumbUrl;
       button.innerHTML = `
-        <img src="${sourceUrl}" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex < 3 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
+        <img src="${sourceUrl}" srcset="${srcset(photo)}" sizes="${Math.ceil(width)}px" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex < 2 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
         <span class="photo-meta">
           <span>${escapeHtml(photo.location)}</span>
           <span>${escapeHtml(photo.date)}</span>
@@ -241,9 +254,30 @@ function renderGallery(photos) {
   });
 }
 
-function setHeroImage(url) {
-  if (heroImage.getAttribute("src") === url) return;
-  heroImage.src = url;
+function setFastHero(photo) {
+  heroImage.removeAttribute("srcset");
+  heroImage.removeAttribute("sizes");
+  heroImage.src = photo.thumbUrl;
+
+  const upgrade = () => {
+    const image = new Image();
+    image.onload = () => {
+      heroImage.src = photo.previewUrl;
+    };
+    image.src = photo.previewUrl;
+  };
+
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(upgrade, { timeout: 1200 });
+  } else {
+    window.setTimeout(upgrade, 500);
+  }
+}
+
+function setImageSource(image, photo, sizes, fallbackUrl) {
+  image.sizes = sizes;
+  image.srcset = srcset(photo);
+  image.src = fallbackUrl || photo.previewUrl;
 }
 
 function preloadImage(url) {
@@ -263,7 +297,7 @@ function preloadLightboxNeighbors() {
   [-1, 1].forEach((offset) => {
     const photo = photoAtOffset(offset);
     if (!photo) return;
-    preloadImage(photo.displayUrl);
+    preloadImage(photo.previewUrl);
   });
 }
 
@@ -271,21 +305,13 @@ function openLightbox(index) {
   if (!renderedPhotos.length || index < 0) return;
   activePhotoIndex = (index + renderedPhotos.length) % renderedPhotos.length;
   const photo = renderedPhotos[activePhotoIndex];
-  lightboxImage.src = photo.displayUrl;
+  setImageSource(lightboxImage, photo, "100vw", photo.previewUrl);
   lightboxImage.alt = photo.caption || `${photo.location} photograph`;
   lightboxLocation.textContent = photo.location;
   lightboxDate.textContent = photo.date;
   lightbox.classList.add("open");
   document.body.style.overflow = "hidden";
   preloadLightboxNeighbors();
-
-  const original = new Image();
-  original.onload = () => {
-    if (lightbox.classList.contains("open") && renderedPhotos[activePhotoIndex]?.id === photo.id) {
-      lightboxImage.src = photo.url;
-    }
-  };
-  original.src = photo.url;
 }
 
 function moveLightbox(delta) {
@@ -296,6 +322,8 @@ function moveLightbox(delta) {
 function closeViewer() {
   lightbox.classList.remove("open");
   lightboxImage.removeAttribute("src");
+  lightboxImage.removeAttribute("srcset");
+  lightboxImage.removeAttribute("sizes");
   activePhotoIndex = -1;
   document.body.style.overflow = "";
 }

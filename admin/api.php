@@ -240,10 +240,13 @@ function cleanup_photo_files($photosDir, $fileName) {
 
     $paths = [
         $photosDir . '/' . $fileName,
-        $photosDir . '/display/' . derivative_name($fileName, 'display-1800'),
+        $photosDir . '/display/' . derivative_name($fileName, 'display-1440'),
         $photosDir . '/display/' . derivative_name($fileName, 'display-2400'),
+        $photosDir . '/display/' . derivative_name($fileName, 'display-1800'),
+        $photosDir . '/display/' . derivative_name($fileName, 'preview-720'),
         $photosDir . '/display/' . derivative_name($fileName, 'preview-960'),
         $photosDir . '/display/' . derivative_name($fileName, 'preview-1400'),
+        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-320'),
         $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-480'),
         $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-640')
     ];
@@ -403,15 +406,15 @@ function save_resized_jpeg($sourcePath, $targetPath, $maxWidth, $quality) {
 
 function ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName) {
     $sourcePath = $photosDir . '/' . basename($fileName);
-    $displayName = derivative_name($fileName, 'display-1800');
-    $previewName = derivative_name($fileName, 'preview-960');
-    $thumbName = derivative_name($fileName, 'thumb-480');
+    $displayName = derivative_name($fileName, 'display-1440');
+    $previewName = derivative_name($fileName, 'preview-720');
+    $thumbName = derivative_name($fileName, 'thumb-320');
     $displayPath = $displayDir . '/' . $displayName;
     $previewPath = $displayDir . '/' . $previewName;
     $thumbPath = $thumbDir . '/' . $thumbName;
-    $createdDisplay = is_file($displayPath) || save_resized_jpeg($sourcePath, $displayPath, 1800, 84);
-    $createdPreview = is_file($previewPath) || save_resized_jpeg($sourcePath, $previewPath, 960, 78);
-    $createdThumb = is_file($thumbPath) || save_resized_jpeg($sourcePath, $thumbPath, 480, 72);
+    $createdDisplay = is_file($displayPath) || save_resized_jpeg($sourcePath, $displayPath, 1440, 80);
+    $createdPreview = is_file($previewPath) || save_resized_jpeg($sourcePath, $previewPath, 720, 72);
+    $createdThumb = is_file($thumbPath) || save_resized_jpeg($sourcePath, $thumbPath, 320, 64);
 
     return [
         'displayFileName' => $createdDisplay ? $displayName : null,
