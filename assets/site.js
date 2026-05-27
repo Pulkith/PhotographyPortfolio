@@ -44,9 +44,9 @@ function responsiveUrls(photo) {
   const previewUrl = absolutePhotoUrl(photo.previewUrl || photo.displayUrl || photo.url);
   const thumbUrl = absolutePhotoUrl(photo.thumbUrl || photo.previewUrl || photo.displayUrl || photo.url);
   return [
-    { url: thumbUrl, width: 320 },
-    { url: previewUrl, width: 720 },
-    { url: displayUrl, width: 1440 }
+    { url: thumbUrl, width: 220 },
+    { url: previewUrl, width: 540 },
+    { url: displayUrl, width: 1080 }
   ];
 }
 
@@ -235,9 +235,9 @@ function renderGallery(photos) {
       button.type = "button";
       button.className = `photo-tile${isFeature ? " feature" : ""}`;
       button.style.width = `${width}px`;
-      const sourceUrl = width > 560 || photo.priority >= 8 ? photo.previewUrl : photo.thumbUrl;
+      const sourceUrl = photo.thumbUrl;
       button.innerHTML = `
-        <img src="${sourceUrl}" srcset="${srcset(photo)}" sizes="${Math.ceil(width)}px" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex < 2 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
+        <img src="${sourceUrl}" srcset="${srcset(photo)}" sizes="${Math.min(Math.ceil(width), 540)}px" alt="${escapeHtml(photo.caption || `${photo.location} photograph`)}" loading="${rowIndex < 2 ? "eager" : "lazy"}" fetchpriority="${rowIndex === 0 ? "high" : "auto"}" decoding="async">
         <span class="photo-meta">
           <span>${escapeHtml(photo.location)}</span>
           <span>${escapeHtml(photo.date)}</span>
@@ -305,7 +305,7 @@ function openLightbox(index) {
   if (!renderedPhotos.length || index < 0) return;
   activePhotoIndex = (index + renderedPhotos.length) % renderedPhotos.length;
   const photo = renderedPhotos[activePhotoIndex];
-  setImageSource(lightboxImage, photo, "100vw", photo.previewUrl);
+  setImageSource(lightboxImage, photo, "min(100vw, 1080px)", photo.previewUrl);
   lightboxImage.alt = photo.caption || `${photo.location} photograph`;
   lightboxLocation.textContent = photo.location;
   lightboxDate.textContent = photo.date;
