@@ -244,6 +244,8 @@ function renderList() {
         </div>
         <div class="admin-actions">
           <button data-action="landing" type="button">${photo.isLanding ? "Landing Image" : "Set Landing"}</button>
+          <button data-action="replace" type="button">Replace Image</button>
+          <input class="admin-replace-input" data-action="replaceFile" type="file" accept="image/*">
           <button class="drag-handle" type="button" title="Drag this row">Drag</button>
           <button data-action="up" type="button">Up</button>
           <button data-action="down" type="button">Down</button>
@@ -252,7 +254,7 @@ function renderList() {
       </div>
     `;
 
-    item.querySelectorAll("input").forEach((input) => {
+    item.querySelectorAll("input[data-key]").forEach((input) => {
       input.addEventListener("input", () => {
         const key = input.dataset.key;
         const nextValue = input.type === "number" ? Number(input.value) : input.value;
@@ -264,6 +266,12 @@ function renderList() {
     item.querySelector('[data-action="down"]').addEventListener("click", () => movePhoto(index, 1));
     item.querySelector('[data-action="delete"]').addEventListener("click", () => deletePhoto(photo.id));
     item.querySelector('[data-action="landing"]').addEventListener("click", () => setLandingPhoto(photo.id));
+    item.querySelector('[data-action="replace"]').addEventListener("click", () => {
+      item.querySelector('[data-action="replaceFile"]').click();
+    });
+    item.querySelector('[data-action="replaceFile"]').addEventListener("change", (event) => {
+      replacePhoto(photo.id, event.target.files?.[0], event.target);
+    });
     item.addEventListener("dragstart", () => {
       draggedId = photo.id;
       item.classList.add("dragging");
@@ -364,6 +372,28 @@ async function deletePhoto(id) {
   } catch (error) {
     await loadPhotos();
     setStatus(`Delete failed against ${API_URL}.`, listStatus);
+  }
+}
+
+async function replacePhoto(id, file, input) {
+  if (!file) return;
+  const photo = photos.find((item) => item.id === id);
+  if (!photo) return;
+
+  setStatus(`Replacing image for ${photo.location || photo.fileName || "photo"}...`, listStatus);
+  const formData = new FormData();
+  formData.append("action", "replace");
+  formData.append("id", id);
+  formData.append("photo", file);
+
+  try {
+    photos = normalize(await apiPost(formData));
+    renderList();
+    setStatus("Image replaced. Metadata, order, priority, and location were preserved.", listStatus);
+  } catch (error) {
+    setStatus(`Replace failed against ${API_URL}.`, listStatus);
+  } finally {
+    if (input) input.value = "";
   }
 }
 

@@ -232,6 +232,25 @@ function derivative_name($fileName, $suffix) {
     return $base . '-' . $suffix . '.jpg';
 }
 
+function cleanup_photo_files($photosDir, $fileName) {
+    $fileName = basename(clean_text($fileName));
+    if ($fileName === '') {
+        return;
+    }
+
+    $paths = [
+        $photosDir . '/' . $fileName,
+        $photosDir . '/display/' . derivative_name($fileName, 'display-2400'),
+        $photosDir . '/display/' . derivative_name($fileName, 'preview-1400'),
+        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-640')
+    ];
+    foreach ($paths as $path) {
+        if (is_file($path)) {
+            unlink($path);
+        }
+    }
+}
+
 function rational_to_float($value) {
     if (is_array($value)) {
         $value = reset($value);
@@ -435,7 +454,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($action, $publicActions, tr
     respond(read_index($indexPath));
 }
 
-$protectedActions = ['upload', 'save', 'delete', 'optimize', 'deriveMetadata'];
+$protectedActions = ['upload', 'replace', 'save', 'delete', 'optimize', 'deriveMetadata'];
 if (in_array($action, $protectedActions, true) && !is_authenticated($authPath, $input)) {
     fail('Authentication required.', 401);
 }
@@ -498,6 +517,65 @@ if ($action === 'upload') {
     respond(read_index($indexPath));
 }
 
+if ($action === 'replace') {
+    $id = clean_text($input['id'] ?? '');
+    if ($id === '') {
+        fail('Missing photo id.');
+    }
+    if (!isset($_FILES['photo']) || !is_uploaded_file($_FILES['photo']['tmp_name'])) {
+        fail('No replacement photo found.');
+    }
+
+    $photoIndex = null;
+    foreach ($index['photos'] as $indexKey => $photo) {
+        if (($photo['id'] ?? '') === $id) {
+            $photoIndex = $indexKey;
+            break;
+        }
+    }
+    if ($photoIndex === null) {
+        fail('Photo not found.', 404);
+    }
+
+    $info = getimagesize($_FILES['photo']['tmp_name']);
+    if ($info === false) {
+        fail('Replacement file is not a supported image.');
+    }
+
+    $original = pathinfo((string) $_FILES['photo']['name'], PATHINFO_FILENAME);
+    $extension = strtolower(pathinfo((string) $_FILES['photo']['name'], PATHINFO_EXTENSION));
+    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'heic', 'heif', 'tif', 'tiff'];
+    if (!in_array($extension, $allowed, true)) {
+        fail('Unsupported image extension.');
+    }
+
+    $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($original)) ?: 'photo';
+    $fileName = $slug . '-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.' . $extension;
+    $destination = $photosDir . '/' . $fileName;
+    if (!move_uploaded_file($_FILES['photo']['tmp_name'], $destination)) {
+        fail('Could not store replacement photo.', 500);
+    }
+
+    $oldFileName = clean_text($index['photos'][$photoIndex]['fileName'] ?? basename((string) ($index['photos'][$photoIndex]['url'] ?? '')));
+    $width = (int) ($info[0] ?? 0);
+    $height = (int) ($info[1] ?? 0);
+    $derivatives = ensure_derivatives($host, $photosDir, $displayDir, $thumbDir, $fileName);
+
+    $index['photos'][$photoIndex]['fileName'] = $fileName;
+    $index['photos'][$photoIndex]['url'] = photo_url($host, $fileName);
+    $index['photos'][$photoIndex]['displayFileName'] = $derivatives['displayFileName'];
+    $index['photos'][$photoIndex]['displayUrl'] = $derivatives['displayUrl'];
+    $index['photos'][$photoIndex]['previewFileName'] = $derivatives['previewFileName'];
+    $index['photos'][$photoIndex]['previewUrl'] = $derivatives['previewUrl'];
+    $index['photos'][$photoIndex]['thumbFileName'] = $derivatives['thumbFileName'];
+    $index['photos'][$photoIndex]['thumbUrl'] = $derivatives['thumbUrl'];
+    $index['photos'][$photoIndex]['aspectRatio'] = $height > 0 ? round($width / $height, 4) : null;
+
+    cleanup_photo_files($photosDir, $oldFileName);
+    write_index($indexPath, $index);
+    respond(read_index($indexPath));
+}
+
 if ($action === 'save') {
     $data = isset($input['data']) && is_array($input['data']) ? $input['data'] : $input;
     $cleanPhotos = [];
@@ -548,19 +626,7 @@ if ($action === 'delete') {
     $index['photos'] = array_values(array_filter($index['photos'], function ($photo) use ($id) {
         return ($photo['id'] ?? '') !== $id;
     }));
-    if ($fileName !== '' && is_file($photosDir . '/' . $fileName)) {
-        unlink($photosDir . '/' . $fileName);
-    }
-    $derivativeFiles = [
-        $photosDir . '/display/' . derivative_name($fileName, 'display-2400'),
-        $photosDir . '/display/' . derivative_name($fileName, 'preview-1400'),
-        $photosDir . '/thumbs/' . derivative_name($fileName, 'thumb-640')
-    ];
-    foreach ($derivativeFiles as $path) {
-        if ($fileName !== '' && is_file($path)) {
-            unlink($path);
-        }
-    }
+    cleanup_photo_files($photosDir, $fileName);
     write_index($indexPath, $index);
     respond(read_index($indexPath));
 }
