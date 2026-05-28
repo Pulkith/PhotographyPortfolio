@@ -12,15 +12,15 @@ const API_INDEX_URL = `${HOST}/admin/api.php?action=list`;
 // };
 
 const IMAGE_WIDTHS = {
-  thumb: 540,          // → 540 (1 step), 1080 (2 steps)
+  thumb: 1080,          // → 540 (1 step), 1080 (2 steps)
 
-  preview: 1080,        // → 1080 (1 step)
+  preview: 2160,        // → 1080 (1 step)
 
-  display: 1600,       // → ~1600–2160 (1–2 steps up)
+  display: 3200,       // → ~1600–2160 (1–2 steps up)
 
-  galleryMax: 1080,     // → 1080 (1 step)
+  galleryMax: 2160,     // → 1080 (1 step)
 
-  lightboxMax: 2160,   // → ~1600–2160 (1–2 steps up)
+  lightboxMax: 4320,   // → ~1600–2160 (1–2 steps up)
 
   eagerRows: 2,        // → 3–4
 
