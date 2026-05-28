@@ -5,9 +5,9 @@ const OPTIMIZATION_TARGETS = {
   // display: { width: 1080, quality: 0.72 },
   // preview: { width: 540, quality: 0.62 },
   // thumb: { width: 220, quality: 0.52 }
-    display: { width: 1440, quality: 0.82 },
-  preview: { width: 720, quality: 0.72 },
-  thumb: { width: 320, quality: 0.62 }
+    display: { width: 2880, quality: 0.82 },
+  preview: { width: 1440, quality: 0.82 },
+  thumb: { width: 720, quality: 0.82 }
 };
 
 const adminLock = document.querySelector("#adminLock");

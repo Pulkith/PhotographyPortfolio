@@ -11,11 +11,11 @@ const API_INDEX_URL = `${HOST}/admin/api.php?action=list`;
 //   lookaheadRows: 2
 // };
 const IMAGE_WIDTHS = {
-  thumb: 320,
-  preview: 720,
-  display: 1440,
-  galleryMax: 720,
-  lightboxMax: 1440,
+  thumb: 720,
+  preview: 1440,
+  display: 2880,
+  galleryMax: 1440,
+  lightboxMax: 2880,
   eagerRows: 2,
   lookaheadRows: 2
 };
