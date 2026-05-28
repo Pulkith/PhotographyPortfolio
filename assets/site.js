@@ -10,22 +10,31 @@ const API_INDEX_URL = `${HOST}/admin/api.php?action=list`;
 //   eagerRows: 2,
 //   lookaheadRows: 2
 // };
-
 const IMAGE_WIDTHS = {
-  thumb: 1080,          // → 540 (1 step), 1080 (2 steps)
-
-  preview: 2160,        // → 1080 (1 step)
-
-  display: 3200,       // → ~1600–2160 (1–2 steps up)
-
-  galleryMax: 2160,     // → 1080 (1 step)
-
-  lightboxMax: 4320,   // → ~1600–2160 (1–2 steps up)
-
-  eagerRows: 2,        // → 3–4
-
-  lookaheadRows: 2     // → 3–4
+  thumb: 320,
+  preview: 720,
+  display: 1440,
+  galleryMax: 720,
+  lightboxMax: 1440,
+  eagerRows: 2,
+  lookaheadRows: 2
 };
+
+// const IMAGE_WIDTHS = {
+//   thumb: 540,          // → 540 (1 step), 1080 (2 steps)
+
+//   preview: 2160,        // → 1080 (1 step)
+
+//   display: 1600,       // → ~1600–2160 (1–2 steps up)
+
+//   galleryMax: 1080,     // → 1080 (1 step)
+
+//   lightboxMax: 2160,   // → ~1600–2160 (1–2 steps up)
+
+//   eagerRows: 2,        // → 3–4
+
+//   lookaheadRows: 2     // → 3–4
+// };
 
 const gallery = document.querySelector("#gallery");
 const heroImage = document.querySelector("#heroImage");
